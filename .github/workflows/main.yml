@@ -11,7 +11,7 @@ jobs:
       - name: Upload binary
         uses: actions/upload-artifact@v4.6.0
         with:
-          name: hsolver
+          name: hsolver_unix
           path: ./hsolver
   build-win:
     runs-on: windows-latest
@@ -23,5 +23,5 @@ jobs:
       - name: Upload binary
         uses: actions/upload-artifact@v4.6.0
         with:
-          name: hsolver
+          name: hsolver_win
           path: ./hsolver.exe
