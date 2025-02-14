@@ -177,12 +177,16 @@ typedef enum hs_output_mode {
     HS_OUTPUT_HEX = 16,
 } hs_output_mode_t;
 
+typedef struct hs_settings {
+    hs_output_mode_t output_mode;
+} hs_settings_t;
+
 typedef struct hs_state {
     hs_var_t *context_vars;
     size_t context_vars_length;
     hs_func_t *context_funcs;
     size_t context_funcs_length;
-    hs_output_mode_t output_mode;
+    hs_settings_t settings;
 } hs_state_t;
 
 hs_state_t hs_default_state() {
@@ -191,7 +195,9 @@ hs_state_t hs_default_state() {
         .context_vars_length = sizeof(hs_default_vars) / sizeof(hs_var_t) + 1,
         .context_funcs = malloc(sizeof(hs_default_funcs)),
         .context_funcs_length = sizeof(hs_default_funcs) / sizeof(hs_func_t),
-        .output_mode = HS_OUTPUT_DEC,
+        .settings = {
+            .output_mode = HS_OUTPUT_DEC,
+        },
     };
     state.context_vars[0].id[0] = 'a';
     state.context_vars[0].id[1] = 'n';
@@ -811,7 +817,7 @@ void hs_output_1dim_f(double value, hs_state_t *state, int8_t max_digits) {
         value = -value;
     }
     double log_base_2 = 1.0;
-    switch (state->output_mode) {
+    switch (state->settings.output_mode) {
         case HS_OUTPUT_HEX:
             putchar('0');
             putchar('x');
@@ -835,7 +841,7 @@ void hs_output_1dim_f(double value, hs_state_t *state, int8_t max_digits) {
     if (highest_digit < 0) {
         highest_digit = 0;
     }
-    double value_of_digit = pow((int)state->output_mode, highest_digit);
+    double value_of_digit = pow((int)state->settings.output_mode, highest_digit);
     bool has_trailing = false;
     for (int32_t i = highest_digit; (fabs(value) >= HS_EPSILON && i > -max_digits) || i >= 0; i--) {
         int digit = (int)(value / value_of_digit + 0.001);
@@ -851,7 +857,7 @@ void hs_output_1dim_f(double value, hs_state_t *state, int8_t max_digits) {
             hs_1dim_out_buf[hs_1dim_i++] = '.';
             has_trailing = true;
         }
-        value_of_digit /= (int)state->output_mode;
+        value_of_digit /= (int)state->settings.output_mode;
     }
     hs_1dim_out_buf[hs_1dim_i] = '\0';
 
@@ -868,16 +874,20 @@ void hs_output_1dim_f(double value, hs_state_t *state, int8_t max_digits) {
 
     size_t trailing_zeros_start = hs_1dim_i;
     bool leading_done = false;
+    bool output_empty = true;
     for (hs_1dim_i = 0; hs_1dim_i <= trailing_zeros_start; hs_1dim_i++) {
         if (hs_1dim_out_buf[hs_1dim_i] != '0' || leading_done) {
             putchar(hs_1dim_out_buf[hs_1dim_i]);
+            output_empty = false;
             leading_done = true;
         }
     }
+    if (output_empty)
+        putchar('0');
 }
 
 void hs_output_1dim(double value, hs_state_t *state) {
-    if ((fabs(value) < HS_SCIENT_MIN || fabs(value) >= HS_SCIENT_MAX) && state->output_mode == HS_OUTPUT_DEC) {
+    if ((fabs(value) < HS_SCIENT_MIN || fabs(value) >= HS_SCIENT_MAX) && fabs(value) >= HS_EPSILON && state->settings.output_mode == HS_OUTPUT_DEC) {
         // scientific output
         int16_t expo = floor(log10(value) / 3.0) * 3;
         hs_output_1dim_f(value / pow(10, expo), state, 3);
@@ -901,7 +911,12 @@ void hs_output(hs_value_t value, hs_state_t *state) {
         putchar('(');
         hs_output_1dim(value.re, state);
         putchar(' ');
-        putchar('+');
+        if (value.im <= -HS_EPSILON) {
+            value.im = -value.im;
+            putchar('-');
+        } else {
+            putchar('+');
+        }
         putchar(' ');
         hs_output_1dim(value.im, state);
         putchar('i');
@@ -911,6 +926,7 @@ void hs_output(hs_value_t value, hs_state_t *state) {
 }
 
 hs_state_t temp_state;
+hs_settings_t temp_settings;
 
 void hs_run(char *input, hs_state_t *state) {
     if (state == NULL) {
@@ -922,39 +938,56 @@ void hs_run(char *input, hs_state_t *state) {
     hs_token_list_t tokens1 = hs_tokenize(input);
     if (tokens1.items == NULL)
         goto hs_run_error;
+
+    bool restore_settings = false;
+    if (tokens1.size > 1) {
+        temp_settings = state->settings;
+    }
+
     hs_token_list_t tokens2 = hs_token_list_init();
     if (tokens2.items == NULL)
         goto hs_run_error;
     for (size_t i = 0; i < tokens1.size; i++) {
         if (tokens1.items[i].kind == HS_TOKEN_ID) {
             if (str_same(tokens1.items[i].content, "dec")) {
-                state->output_mode = HS_OUTPUT_DEC;
+                state->settings.output_mode = HS_OUTPUT_DEC;
+                restore_settings = true;
                 continue;
             } else if (str_same(tokens1.items[i].content, "hex")) {
-                state->output_mode = HS_OUTPUT_HEX;
+                state->settings.output_mode = HS_OUTPUT_HEX;
+                restore_settings = true;
                 continue;
             } else if (str_same(tokens1.items[i].content, "oct")) {
-                state->output_mode = HS_OUTPUT_OCT;
+                state->settings.output_mode = HS_OUTPUT_OCT;
+                restore_settings = true;
                 continue;
             } else if (str_same(tokens1.items[i].content, "bin")) {
-                state->output_mode = HS_OUTPUT_BIN;
+                state->settings.output_mode = HS_OUTPUT_BIN;
+                restore_settings = true;
                 continue;
             }
         }
         if (!hs_token_list_push(&tokens2, tokens1.items[i]))
             goto hs_run_error;
     }
+    if (tokens2.items[0].kind == HS_TOKEN_EOF) {
+        restore_settings = false;
+    }
     free(tokens1.items);
+
     hs_token_list_t tokens3 = hs_shunting_yard(tokens2);
     if (tokens3.items == NULL)
         goto hs_run_error;
     free(tokens2.items);
+
     if (tokens3.size > 0) {
         // assuming the first context_var is "ans"
         hs_value_t result = state->context_vars[0].value = hs_solve(tokens3, state);
         free(tokens3.items);
         hs_output(result, state);
     }
+    if (restore_settings)
+        state->settings = temp_settings;
     return;
 
 hs_run_error:
@@ -964,6 +997,9 @@ hs_run_error:
         free(tokens2.items);
     if (tokens3.items != NULL)
         free(tokens3.items);
+
+    if (restore_settings)
+        state->settings = temp_settings;
 }
 
 int main(int argc, char *argv[]) {
