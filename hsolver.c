@@ -817,29 +817,37 @@ void hs_output_1dim_f(double value, hs_state_t *state, int8_t max_digits) {
         value = -value;
     }
     double log_base_2 = 1.0;
+    uint8_t sep_spacing = 4;
     switch (state->settings.output_mode) {
         case HS_OUTPUT_HEX:
             putchar('0');
             putchar('x');
             log_base_2 = 1.0 / 4.0;
+            sep_spacing = 2;
             break;
         case HS_OUTPUT_OCT:
             putchar('0');
             putchar('o');
             log_base_2 = 1.0 / 3.0;
+            sep_spacing = 2;
             break;
         case HS_OUTPUT_DEC:
             log_base_2 = 0.301029995664;
+            sep_spacing = 3;
             break;
         case HS_OUTPUT_BIN:
             putchar('0');
             putchar('b');
             log_base_2 = 1.0;
+            sep_spacing = 4;
             break;
     }
     int32_t highest_digit = (int32_t)(log2(value) * log_base_2) + 1;
     if (highest_digit < 0) {
         highest_digit = 0;
+    }
+    if (state->settings.output_mode == HS_OUTPUT_BIN) {
+        highest_digit = (highest_digit + 3) / 4 * 4 - 1;
     }
     double value_of_digit = pow((int)state->settings.output_mode, highest_digit);
     bool has_trailing = false;
@@ -856,6 +864,8 @@ void hs_output_1dim_f(double value, hs_state_t *state, int8_t max_digits) {
         if (i == 0) {
             hs_1dim_out_buf[hs_1dim_i++] = '.';
             has_trailing = true;
+        } else if (i % sep_spacing == 0 && i > 0) {
+            hs_1dim_out_buf[hs_1dim_i++] = '\'';
         }
         value_of_digit /= (int)state->settings.output_mode;
     }
@@ -863,7 +873,7 @@ void hs_output_1dim_f(double value, hs_state_t *state, int8_t max_digits) {
 
     if (has_trailing) {
         for (hs_1dim_i--; hs_1dim_i > 0; hs_1dim_i--) {
-            if (hs_1dim_out_buf[hs_1dim_i] != '0') {
+            if (hs_1dim_out_buf[hs_1dim_i] != '0' && hs_1dim_out_buf[hs_1dim_i] != '\'') {
                 if (hs_1dim_out_buf[hs_1dim_i] == '.') {
                     hs_1dim_i--;
                 }
@@ -874,9 +884,12 @@ void hs_output_1dim_f(double value, hs_state_t *state, int8_t max_digits) {
 
     size_t trailing_zeros_start = hs_1dim_i;
     bool leading_done = false;
+    if (state->settings.output_mode == HS_OUTPUT_BIN) {
+        leading_done = true;
+    }
     bool output_empty = true;
     for (hs_1dim_i = 0; hs_1dim_i <= trailing_zeros_start; hs_1dim_i++) {
-        if (hs_1dim_out_buf[hs_1dim_i] != '0' || leading_done) {
+        if ((hs_1dim_out_buf[hs_1dim_i] != '0' && hs_1dim_out_buf[hs_1dim_i] != '\'') || leading_done) {
             putchar(hs_1dim_out_buf[hs_1dim_i]);
             output_empty = false;
             leading_done = true;
