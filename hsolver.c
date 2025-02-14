@@ -4,6 +4,9 @@
 #include <malloc.h>
 #include <math.h>
 
+// TODO: negative literals
+// TODO: custom variables and custom functions to context (funcs must start with letter)
+
 #define SCIENT_MIN 0.01
 #define SCIENT_MAX 10000
 #define BUF_SIZE 64
@@ -149,21 +152,21 @@ typedef struct hs_func {
 } hs_func_t;
 
 hs_func_t hs_default_funcs[] = {
-    {.id = "add", .params = 2, .func = hs_f_add},
-    {.id = "subtract", .params = 2, .func = hs_f_subtract},
-    {.id = "multiply", .params = 2, .func = hs_f_multiply},
-    {.id = "divide", .params = 2, .func = hs_f_divide},
-    {.id = "modulo", .params = 2, .func = hs_f_modulo},
-    {.id = "pow", .params = 2, .func = hs_f_pow},
-    {.id = "root", .params = 2, .func = hs_f_root},
-    {.id = "sqrt", .params = 1, .func = hs_f_sqrt},
-    {.id = "round", .params = 1, .func = hs_f_round},
-    {.id = "floor", .params = 1, .func = hs_f_floor},
-    {.id = "ceil", .params = 1, .func = hs_f_ceil},
-    {.id = "abs", .params = 1, .func = hs_f_abs},
-    {.id = "ln", .params = 1, .func = hs_f_ln},
-    {.id = "log2", .params = 1, .func = hs_f_log2},
-    {.id = "log10", .params = 1, .func = hs_f_log10},
+    {.id = "add",       .func = hs_f_add,       .params = 2},
+    {.id = "subtract",  .func = hs_f_subtract,  .params = 2},
+    {.id = "multiply",  .func = hs_f_multiply,  .params = 2},
+    {.id = "divide",    .func = hs_f_divide,    .params = 2},
+    {.id = "modulo",    .func = hs_f_modulo,    .params = 2},
+    {.id = "pow",       .func = hs_f_pow,       .params = 2},
+    {.id = "root",      .func = hs_f_root,      .params = 2},
+    {.id = "sqrt",      .func = hs_f_sqrt,      .params = 1},
+    {.id = "round",     .func = hs_f_round,     .params = 1},
+    {.id = "floor",     .func = hs_f_floor,     .params = 1},
+    {.id = "ceil",      .func = hs_f_ceil,      .params = 1},
+    {.id = "abs",       .func = hs_f_abs,       .params = 1},
+    {.id = "ln",        .func = hs_f_ln,        .params = 1},
+    {.id = "log2",      .func = hs_f_log2,      .params = 1},
+    {.id = "log10",     .func = hs_f_log10,     .params = 1},
 };
 
 typedef enum hs_output_mode {
@@ -282,25 +285,28 @@ hs_token_t hs_token_list_pop(hs_token_list_t *list) {
 hs_token_list_t hs_tokenize(char *input) {
     hs_token_list_t tokens = hs_token_list_init();
 
+    if (tokens.items == NULL)
+        goto hs_tokenize_error;
+
     for (size_t i = 0; input[i] != '\0'; i++) {
         if (input[i] == '+') {
-            if (!hs_token_list_push(&tokens, (hs_token_t){.kind = HS_TOKEN_ADD})) return tokens;
+            if (!hs_token_list_push(&tokens, (hs_token_t){.kind = HS_TOKEN_ADD})) goto hs_tokenize_error;
         } else if (input[i] == '-') {
-            if (!hs_token_list_push(&tokens, (hs_token_t){.kind = HS_TOKEN_SUBTRACT})) return tokens;
+            if (!hs_token_list_push(&tokens, (hs_token_t){.kind = HS_TOKEN_SUBTRACT})) goto hs_tokenize_error;
         } else if (input[i] == '*') {
-            if (!hs_token_list_push(&tokens, (hs_token_t){.kind = HS_TOKEN_MULTIPLY})) return tokens;
+            if (!hs_token_list_push(&tokens, (hs_token_t){.kind = HS_TOKEN_MULTIPLY})) goto hs_tokenize_error;
         } else if (input[i] == '/') {
-            if (!hs_token_list_push(&tokens, (hs_token_t){.kind = HS_TOKEN_DIVIDE})) return tokens;
+            if (!hs_token_list_push(&tokens, (hs_token_t){.kind = HS_TOKEN_DIVIDE})) goto hs_tokenize_error;
         } else if (input[i] == '%') {
-            if (!hs_token_list_push(&tokens, (hs_token_t){.kind = HS_TOKEN_MODULO})) return tokens;
+            if (!hs_token_list_push(&tokens, (hs_token_t){.kind = HS_TOKEN_MODULO})) goto hs_tokenize_error;
         } else if (input[i] == '^') {
-            if (!hs_token_list_push(&tokens, (hs_token_t){.kind = HS_TOKEN_POWER})) return tokens;
+            if (!hs_token_list_push(&tokens, (hs_token_t){.kind = HS_TOKEN_POWER})) goto hs_tokenize_error;
         } else if (input[i] == '(') {
-            if (!hs_token_list_push(&tokens, (hs_token_t){.kind = HS_TOKEN_OPEN_P})) return tokens;
+            if (!hs_token_list_push(&tokens, (hs_token_t){.kind = HS_TOKEN_OPEN_P})) goto hs_tokenize_error;
         } else if (input[i] == ')') {
-            if (!hs_token_list_push(&tokens, (hs_token_t){.kind = HS_TOKEN_CLOSE_P})) return tokens;
+            if (!hs_token_list_push(&tokens, (hs_token_t){.kind = HS_TOKEN_CLOSE_P})) goto hs_tokenize_error;
         } else if (input[i] == ',') {
-            if (!hs_token_list_push(&tokens, (hs_token_t){.kind = HS_TOKEN_COMMA})) return tokens;
+            if (!hs_token_list_push(&tokens, (hs_token_t){.kind = HS_TOKEN_COMMA})) goto hs_tokenize_error;
         } else if ((input[i] >= '0' && input[i] <= '9') || input[i] == '.') {
             hs_token_t token_lit;
             if (input[i] == '0') {
@@ -314,7 +320,8 @@ hs_token_list_t hs_tokenize(char *input) {
                     }
                     token_lit.content[i - token_start] = '\0';
                     i--;
-                    hs_token_list_push(&tokens, token_lit);
+                    if (!hs_token_list_push(&tokens, token_lit))
+                        goto hs_tokenize_error;
                     continue;
                 } else if (input[i + 1] == 'o') {
                     i += 2;
@@ -326,7 +333,8 @@ hs_token_list_t hs_tokenize(char *input) {
                     }
                     token_lit.content[i - token_start] = '\0';
                     i--;
-                    hs_token_list_push(&tokens, token_lit);
+                    if (!hs_token_list_push(&tokens, token_lit))
+                        goto hs_tokenize_error;
                     continue;
                 } else if (input[i + 1] == 'x') {
                     i += 2;
@@ -338,7 +346,8 @@ hs_token_list_t hs_tokenize(char *input) {
                     }
                     token_lit.content[i - token_start] = '\0';
                     i--;
-                    hs_token_list_push(&tokens, token_lit);
+                    if (!hs_token_list_push(&tokens, token_lit))
+                        goto hs_tokenize_error;
                     continue;
                 }
             }
@@ -350,7 +359,8 @@ hs_token_list_t hs_tokenize(char *input) {
             }
             token_lit.content[i - token_start] = '\0';
             i--;
-            hs_token_list_push(&tokens, token_lit);
+            if (!hs_token_list_push(&tokens, token_lit))
+                goto hs_tokenize_error;
         } else if (input[i] >= 'a' && input[i] <= 'z') {
             hs_token_t token_id = {.kind = HS_TOKEN_ID};
             size_t token_start = i;
@@ -360,11 +370,16 @@ hs_token_list_t hs_tokenize(char *input) {
             }
             token_id.content[i - token_start] = '\0';
             i--;
-            hs_token_list_push(&tokens, token_id);
+            if (!hs_token_list_push(&tokens, token_id))
+                goto hs_tokenize_error;
         }
     }
-    hs_token_list_push(&tokens, (hs_token_t){.kind = HS_TOKEN_EOF});
+    if (!hs_token_list_push(&tokens, (hs_token_t){.kind = HS_TOKEN_EOF}))
+        goto hs_tokenize_error;
 
+    return tokens;
+
+hs_tokenize_error:
     return tokens;
 }
 
@@ -402,7 +417,11 @@ hs_token_list_t hs_shunting_yard(hs_token_list_t tokens) {
     size_t input_i = 0;
     hs_token_list_t output = hs_token_list_init();
     hs_token_list_t stack = hs_token_list_init();
-    // TODO: check stack.items == NULL (everywhere)
+
+    if (output.items == NULL)
+        goto hs_shunting_yard_error;
+    if (stack.items == NULL)
+        goto hs_shunting_yard_error;
 
     int32_t last_value = -2;
     while (input_i < tokens.size) {
@@ -415,7 +434,8 @@ hs_token_list_t hs_shunting_yard(hs_token_list_t tokens) {
                 if (tokens.items[input_i].kind == HS_TOKEN_ID) {
                     if (tokens.items[input_i + 1].kind == HS_TOKEN_OPEN_P) {
                         // function call
-                        hs_token_list_push(&stack, tokens.items[input_i]);
+                        if (!hs_token_list_push(&stack, tokens.items[input_i]))
+                            goto hs_shunting_yard_error;
                         break;
                     } else {
                         tokens.items[input_i].kind = HS_TOKEN_ID_IS_VAR;
@@ -425,27 +445,31 @@ hs_token_list_t hs_shunting_yard(hs_token_list_t tokens) {
                                    hs_is_op(stack.items[stack.size - 1].kind) &&
                                    hs_op_prio(HS_TOKEN_MULTIPLY) <= hs_op_prio(stack.items[stack.size - 1].kind)) {
                                 // TODO: except for exponent, possibly
-                                hs_token_list_push(&output, hs_token_list_pop(&stack));
+                                if (!hs_token_list_push(&output, hs_token_list_pop(&stack)))
+                                    goto hs_shunting_yard_error;
                             }
-                            hs_token_list_push(&stack, (hs_token_t){.kind = HS_TOKEN_MULTIPLY});
+                            if (!hs_token_list_push(&stack, (hs_token_t){.kind = HS_TOKEN_MULTIPLY}))
+                                goto hs_shunting_yard_error;
                         }
                     }
                 } else {
                     last_value = input_i;
                 }
                 // var or value
-                hs_token_list_push(&output, tokens.items[input_i]);
+                if (!hs_token_list_push(&output, tokens.items[input_i]))
+                    goto hs_shunting_yard_error;
                 break;
             case HS_TOKEN_COMMA:
                 if (stack.size == 0) {
                     printf("ERROR: unexpected comma" ENDLLL);
-                    break;
+                    goto hs_shunting_yard_error;
                 }
                 while (stack.items[stack.size - 1].kind != HS_TOKEN_OPEN_P) {
-                    hs_token_list_push(&output, hs_token_list_pop(&stack));
+                    if (!hs_token_list_push(&output, hs_token_list_pop(&stack)))
+                        goto hs_shunting_yard_error;
                     if (stack.size == 0) {
                         printf("ERROR: unexpected comma" ENDLLL);
-                        break;
+                        goto hs_shunting_yard_error;
                     }
                 }
                 break;
@@ -459,9 +483,11 @@ hs_token_list_t hs_shunting_yard(hs_token_list_t tokens) {
                        hs_is_op(stack.items[stack.size - 1].kind) &&
                        hs_op_prio(tokens.items[input_i].kind) <= hs_op_prio(stack.items[stack.size - 1].kind)) {
                     // TODO: except for exponent, possibly
-                    hs_token_list_push(&output, hs_token_list_pop(&stack));
+                    if (!hs_token_list_push(&output, hs_token_list_pop(&stack)))
+                        goto hs_shunting_yard_error;
                 }
-                hs_token_list_push(&stack, tokens.items[input_i]);
+                if (!hs_token_list_push(&stack, tokens.items[input_i]))
+                    goto hs_shunting_yard_error;
                 break;
             case HS_TOKEN_OPEN_P:
                 if (last_value == input_i - 1) {
@@ -470,27 +496,32 @@ hs_token_list_t hs_shunting_yard(hs_token_list_t tokens) {
                            hs_is_op(stack.items[stack.size - 1].kind) &&
                            hs_op_prio(HS_TOKEN_MULTIPLY) <= hs_op_prio(stack.items[stack.size - 1].kind)) {
                         // TODO: except for exponent, possibly
-                        hs_token_list_push(&output, hs_token_list_pop(&stack));
+                        if (!hs_token_list_push(&output, hs_token_list_pop(&stack)))
+                            goto hs_shunting_yard_error;
                     }
-                    hs_token_list_push(&stack, (hs_token_t){.kind = HS_TOKEN_MULTIPLY});
+                    if (!hs_token_list_push(&stack, (hs_token_t){.kind = HS_TOKEN_MULTIPLY}))
+                        goto hs_shunting_yard_error;
                 }
-                hs_token_list_push(&stack, tokens.items[input_i]);
+                if (!hs_token_list_push(&stack, tokens.items[input_i]))
+                    goto hs_shunting_yard_error;
                 break;
             case HS_TOKEN_CLOSE_P:
                 if (stack.size == 0) {
                     printf("ERROR: closing parenthesis without opening one" ENDLLL);
-                    break;
+                    goto hs_shunting_yard_error;
                 }
                 while (stack.items[stack.size - 1].kind != HS_TOKEN_OPEN_P) {
                     if (stack.size == 0) {
                         printf("ERROR: closing parenthesis without opening one" ENDLLL);
-                        break;
+                        goto hs_shunting_yard_error;
                     }
-                    hs_token_list_push(&output, hs_token_list_pop(&stack));
+                    if (!hs_token_list_push(&output, hs_token_list_pop(&stack)))
+                        goto hs_shunting_yard_error;
                 }
                 hs_token_list_pop(&stack);
                 if (stack.size > 0 && stack.items[stack.size - 1].kind == HS_TOKEN_ID) {
-                    hs_token_list_push(&output, hs_token_list_pop(&stack));
+                    if (!hs_token_list_push(&output, hs_token_list_pop(&stack)))
+                        goto hs_shunting_yard_error;
                 }
                 break;
             case HS_TOKEN_EOF:
@@ -505,11 +536,17 @@ hs_token_list_t hs_shunting_yard(hs_token_list_t tokens) {
             printf("ERROR: more opening than closing parentheses" ENDLLL);
             break;
         }
-        // TODO: check if push even worked, otherwise fuck off (everywhere)
-        hs_token_list_push(&output, stack_token);
+        if (!hs_token_list_push(&output, stack_token))
+            goto hs_shunting_yard_error;
     }
 
     free(stack.items);
+
+    return output;
+
+hs_shunting_yard_error:
+    if (stack.items != NULL)
+        free(stack.items);
 
     return output;
 }
@@ -542,12 +579,15 @@ bool hs_value_list_push(hs_value_list_t *list, hs_value_t item) {
             return false;
         }
     }
+    if (list->items == NULL) {
+        return false;
+    }
     list->items[list->size++] = item;
     return true;
 }
 
 hs_value_t hs_value_list_pop(hs_value_list_t *list) {
-    if (list->size > 0) {
+    if (list->size > 0 && list->items != NULL) {
         list->size--;
         return list->items[list->size];
     } else {
@@ -566,10 +606,12 @@ bool str_same(char *a, char *b) {
     return a[i] == '\0' && b[i] == '\0';
 }
 
-// TODO: negative literals
-
 hs_value_t hs_solve(hs_token_list_t tokens, hs_state_t *state) {
     hs_value_list_t list = hs_rpn_list_init();
+    hs_value_t result = HS_ZERO;
+
+    if (list.items == NULL)
+        goto hs_solve_error;
 
     for (size_t i = 0; i < tokens.size; i++) {
         hs_value_t a, b;
@@ -614,20 +656,23 @@ hs_value_t hs_solve(hs_token_list_t tokens, hs_state_t *state) {
                         frac = true;
                     }
                 }
-                hs_value_list_push(&list, lit_value);
+                if (!hs_value_list_push(&list, lit_value))
+                    goto hs_solve_error;
                 break;
             }
             case HS_TOKEN_ID_IS_VAR: {
                 bool var_found = false;
                 for (size_t j = 0; j < state->context_vars_length; j++) {
                     if (str_same(tokens.items[i].content, state->context_vars[j].id)) {
-                        hs_value_list_push(&list, state->context_vars[j].value);
+                        if (!hs_value_list_push(&list, state->context_vars[j].value))
+                            goto hs_solve_error;
                         var_found = true;
                         break;
                     }
                 }
                 if (!var_found) {
                     printf("ERROR: var %s not found" ENDLLL, tokens.items[i].content);
+                    goto hs_solve_error;
                 }
                 break;
             }
@@ -644,63 +689,80 @@ hs_value_t hs_solve(hs_token_list_t tokens, hs_state_t *state) {
                             a = hs_value_list_pop(&list);
                             return_value = state->context_funcs[j].func(a, b);
                         }
-                        hs_value_list_push(&list, return_value);
+                        if (!hs_value_list_push(&list, return_value))
+                            goto hs_solve_error;
                         function_found = true;
                         break;
                     }
                 }
                 if (!function_found) {
                     printf("ERROR: function %s not found" ENDLLL, tokens.items[i].content);
+                    goto hs_solve_error;
                 }
                 break;
             }
             case HS_TOKEN_COMMA:
                 printf("ERROR: comma made it to rpn?" ENDLLL);
-                break;
+                goto hs_solve_error;
             case HS_TOKEN_ADD:
                 b = hs_value_list_pop(&list);
                 a = hs_value_list_pop(&list);
-                hs_value_list_push(&list, hs_f_add(a, b));
+                if (!hs_value_list_push(&list, hs_f_add(a, b)))
+                    goto hs_solve_error;
                 break;
             case HS_TOKEN_SUBTRACT:
                 b = hs_value_list_pop(&list);
                 a = hs_value_list_pop(&list);
-                hs_value_list_push(&list, hs_f_subtract(a, b));
+                if (!hs_value_list_push(&list, hs_f_subtract(a, b)))
+                    goto hs_solve_error;
                 break;
             case HS_TOKEN_MULTIPLY:
                 b = hs_value_list_pop(&list);
                 a = hs_value_list_pop(&list);
-                hs_value_list_push(&list, hs_f_multiply(a, b));
+                if (!hs_value_list_push(&list, hs_f_multiply(a, b)))
+                    goto hs_solve_error;
                 break;
             case HS_TOKEN_DIVIDE:
                 b = hs_value_list_pop(&list);
                 a = hs_value_list_pop(&list);
-                hs_value_list_push(&list, hs_f_divide(a, b));
+                if (!hs_value_list_push(&list, hs_f_divide(a, b)))
+                    goto hs_solve_error;
                 break;
             case HS_TOKEN_MODULO:
                 b = hs_value_list_pop(&list);
                 a = hs_value_list_pop(&list);
-                hs_value_list_push(&list, hs_f_modulo(a, b));
+                if (!hs_value_list_push(&list, hs_f_modulo(a, b)))
+                    goto hs_solve_error;
                 break;
             case HS_TOKEN_POWER:
                 b = hs_value_list_pop(&list);
                 a = hs_value_list_pop(&list);
-                hs_value_list_push(&list, hs_f_pow(a, b));
+                if (!hs_value_list_push(&list, hs_f_pow(a, b)))
+                    goto hs_solve_error;
                 break;
             default:
                 break;
         }
     }
 
-    hs_value_t result = HS_ZERO;
     if (list.size == 0) {
         printf("ERROR: something went wrong during rpn calculation" ENDLLL);
+        goto hs_solve_error;
     } else {
         if (list.size > 1) {
             printf("WARNING: multiple entries left at end of rpn, which is slightly odd" ENDLLL);
         }
         result = hs_value_list_pop(&list);
     }
+
+    free(list.items);
+
+    return result;
+
+hs_solve_error:
+    if (list.size > 0 && list.items != NULL)
+        result = hs_value_list_pop(&list);
+    printf("(possibly erroneous) ");
 
     free(list.items);
 
@@ -766,7 +828,6 @@ void hs_output(hs_value_t value, hs_state_t *state) {
 hs_state_t temp_state;
 
 void hs_run(char *input, hs_state_t *state) {
-    // TODO: custom variables and custom functions to context (funcs must start with letter)
     if (state == NULL) {
         temp_state = hs_default_state();
         state = &temp_state;
@@ -774,7 +835,11 @@ void hs_run(char *input, hs_state_t *state) {
 
     hs_preprocess_input(input);
     hs_token_list_t tokens1 = hs_tokenize(input);
+    if (tokens1.items == NULL)
+        goto hs_run_error;
     hs_token_list_t tokens2 = hs_token_list_init();
+    if (tokens2.items == NULL)
+        goto hs_run_error;
     for (size_t i = 0; i < tokens1.size; i++) {
         if (tokens1.items[i].kind == HS_TOKEN_ID) {
             if (str_same(tokens1.items[i].content, "dec")) {
@@ -791,10 +856,13 @@ void hs_run(char *input, hs_state_t *state) {
                 continue;
             }
         }
-        hs_token_list_push(&tokens2, tokens1.items[i]);
+        if (!hs_token_list_push(&tokens2, tokens1.items[i]))
+            goto hs_run_error;
     }
     free(tokens1.items);
     hs_token_list_t tokens3 = hs_shunting_yard(tokens2);
+    if (tokens3.items == NULL)
+        goto hs_run_error;
     free(tokens2.items);
     if (tokens3.size > 0) {
         // assuming the first context_var is "ans"
@@ -802,6 +870,15 @@ void hs_run(char *input, hs_state_t *state) {
         free(tokens3.items);
         hs_output(result, state);
     }
+    return;
+
+hs_run_error:
+    if (tokens1.items != NULL)
+        free(tokens1.items);
+    if (tokens2.items != NULL)
+        free(tokens2.items);
+    if (tokens3.items != NULL)
+        free(tokens3.items);
 }
 
 int main(int argc, char *argv[]) {
