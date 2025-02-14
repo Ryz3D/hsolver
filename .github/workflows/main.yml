@@ -1,0 +1,15 @@
+name: build
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+      - name: Compile
+        run: gcc -std=c23 -Wall hsolver.c -o ./hsolver
+      - name: Upload binary
+        uses: actions/upload-artifact@v4.6.0
+        with:
+          name: hsolver
+          path: ./hsolver
