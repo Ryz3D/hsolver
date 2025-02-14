@@ -6,7 +6,7 @@
         {
             "label": "build",
             "type": "shell",
-            "command": "gcc -g -Wall -std=c99 -D WIN -o hsolver.exe hsolver.c",
+            "command": "gcc -g -Wall -std=c2x -D WIN -o hsolver.exe hsolver.c -lm",
             "problemMatcher": "$gcc",
             "presentation": {
                 "reveal": "silent",

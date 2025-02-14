@@ -183,7 +183,7 @@ typedef struct hs_state {
 
 hs_state_t hs_default_state() {
     hs_state_t state = {
-        .context_vars = malloc(sizeof(hs_default_vars)),
+        .context_vars = malloc(sizeof(hs_default_vars) + 1 * sizeof(hs_var_t)),
         .context_vars_length = sizeof(hs_default_vars) / sizeof(hs_var_t) + 1,
         .context_funcs = malloc(sizeof(hs_default_funcs)),
         .context_funcs_length = sizeof(hs_default_funcs) / sizeof(hs_func_t),
