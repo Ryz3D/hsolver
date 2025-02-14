@@ -5,6 +5,7 @@
 #include <stdio.h>
 
 #define ENDL "\r\n"
+#define SIZE_T_F "%lu"
 #define SCIENT_MIN 0.01
 #define SCIENT_MAX 10000
 #define BUF_SIZE 64
@@ -239,7 +240,7 @@ bool hs_token_list_push(hs_token_list_t *list, hs_token_t token) {
         list->capacity *= 2;
         list->items = realloc(list->items, list->capacity * sizeof(hs_token_t));
         if (list->items == NULL) {
-            printf("out of memory during token list reallocation at %llu tokens :(" ENDL, list->size);
+            printf("out of memory during token list reallocation at " SIZE_T_F " tokens :(" ENDL, list->size);
             return false;
         }
     }
@@ -517,7 +518,7 @@ bool hs_value_list_push(hs_value_list_t *list, hs_value_t item) {
         list->capacity *= 2;
         list->items = realloc(list->items, list->capacity * sizeof(hs_value_t));
         if (list->items == NULL) {
-            printf("out of memory during value list reallocation at %llu items :(" ENDL, list->size);
+            printf("out of memory during value list reallocation at " SIZE_T_F " items :(" ENDL, list->size);
             return false;
         }
     }
