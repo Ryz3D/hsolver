@@ -7,23 +7,24 @@
 // TODO: negative literals
 // TODO: custom variables and custom functions to context (funcs must start with letter)
 
-#define SCIENT_MIN 0.01
-#define SCIENT_MAX 10000
-#define BUF_SIZE 64
+#define HS_SCIENT_MIN 0.01
+#define HS_SCIENT_MAX 10000
+#define HS_BUF_SIZE 64
 #define HS_EPSILON 1e-20
+#define HS_MAX_FRAC_DIGITS 13
 
 #ifdef WIN
-#define ENDLLL "\r\n"
+#define ENDL "\r\n"
 #define SIZE_T_F "%i"
 #endif
 #ifdef UNIX
-#define ENDLLL "\n"
+#define ENDL "\n"
 #define SIZE_T_F "%lu"
 #endif
 
-#ifndef ENDLLL
+#ifndef ENDL
 #warning "Please specify platform using -D WIN or -D UNIX"
-#define ENDLLL "\n"
+#define ENDL "\n"
 #endif
 #ifndef SIZE_T_F
 #define SIZE_T_F "%lu"
@@ -38,7 +39,7 @@ typedef struct hs_value {
 } hs_value_t;
 
 typedef struct hs_var {
-    char id[BUF_SIZE];
+    char id[HS_BUF_SIZE];
     hs_value_t value;
 } hs_var_t;
 
@@ -74,7 +75,7 @@ hs_value_t hs_f_multiply(hs_value_t a, hs_value_t b) {
 
 hs_value_t hs_f_divide(hs_value_t a, hs_value_t b) {
     if (hs_f_abs(b, HS_ZERO).re < HS_EPSILON) {
-        printf("ERROR: division by zero" ENDLLL);
+        printf("ERROR: division by zero" ENDL);
         return (hs_value_t){.re = NAN, .im = NAN};
     }
     return (hs_value_t){.re = (a.re * b.re + a.im * b.im) / (b.re * b.re + b.im * b.im), .im = (a.im * b.re - a.re * b.im) / (b.re * b.re + b.im * b.im)};
@@ -102,7 +103,7 @@ hs_value_t hs_f_modulo(hs_value_t a, hs_value_t b) {
 
 hs_value_t hs_f_pow(hs_value_t a, hs_value_t b) {
     if (fabs(a.im) >= HS_EPSILON || fabs(b.im) >= HS_EPSILON) {
-        printf("ERROR: i'm sorry dave, i can't let you do that with complex numbers" ENDLLL);
+        printf("ERROR: i'm sorry dave, i can't let you do that with complex numbers" ENDL);
         return (hs_value_t){.re = NAN, .im = NAN};
     }
     return (hs_value_t){.re = pow(a.re, b.re), .im = 0};
@@ -110,7 +111,7 @@ hs_value_t hs_f_pow(hs_value_t a, hs_value_t b) {
 
 hs_value_t hs_f_root(hs_value_t a, hs_value_t b) {
     if (fabs(a.im) >= HS_EPSILON || fabs(b.im) >= HS_EPSILON) {
-        printf("ERROR: i'm sorry dave, i can't let you do that with complex numbers" ENDLLL);
+        printf("ERROR: i'm sorry dave, i can't let you do that with complex numbers" ENDL);
         return (hs_value_t){.re = NAN, .im = NAN};
     }
     return hs_f_pow(a, hs_f_divide(HS_ONE, b));
@@ -131,7 +132,7 @@ hs_value_t hs_f_ln(hs_value_t a, hs_value_t b) {
 
 hs_value_t hs_f_log2(hs_value_t a, hs_value_t b) {
     if (fabs(a.im) >= HS_EPSILON) {
-        printf("ERROR: i'm sorry dave, i can't let you do that with complex numbers" ENDLLL);
+        printf("ERROR: i'm sorry dave, i can't let you do that with complex numbers" ENDL);
         return (hs_value_t){.re = NAN, .im = NAN};
     }
     return (hs_value_t){.re = log2(a.re), .im = 0};
@@ -139,14 +140,14 @@ hs_value_t hs_f_log2(hs_value_t a, hs_value_t b) {
 
 hs_value_t hs_f_log10(hs_value_t a, hs_value_t b) {
     if (fabs(a.im) >= HS_EPSILON) {
-        printf("ERROR: i'm sorry dave, i can't let you do that with complex numbers" ENDLLL);
+        printf("ERROR: i'm sorry dave, i can't let you do that with complex numbers" ENDL);
         return (hs_value_t){.re = NAN, .im = NAN};
     }
     return (hs_value_t){.re = log10(a.re), .im = 0};
 }
 
 typedef struct hs_func {
-    char id[BUF_SIZE];
+    char id[HS_BUF_SIZE];
     hs_value_t (*func)(hs_value_t a, hs_value_t b);
     uint8_t params;
 } hs_func_t;
@@ -170,10 +171,10 @@ hs_func_t hs_default_funcs[] = {
 };
 
 typedef enum hs_output_mode {
-    HS_OUTPUT_DEC,
-    HS_OUTPUT_HEX,
-    HS_OUTPUT_OCT,
-    HS_OUTPUT_BIN,
+    HS_OUTPUT_BIN = 2,
+    HS_OUTPUT_OCT = 8,
+    HS_OUTPUT_DEC = 10,
+    HS_OUTPUT_HEX = 16,
 } hs_output_mode_t;
 
 typedef struct hs_state {
@@ -236,7 +237,7 @@ typedef enum hs_token_kind {
 
 typedef struct hs_token {
     hs_token_kind_t kind;
-    char content[BUF_SIZE];
+    char content[HS_BUF_SIZE];
 } hs_token_t;
 
 typedef struct hs_token_list {
@@ -252,7 +253,7 @@ hs_token_list_t hs_token_list_init() {
         .size = 0,
     };
     if (list.items == NULL) {
-        printf("out of memory during token list initialization :(" ENDLLL);
+        printf("ERROR: out of memory during token list initialization :(" ENDL);
         return list;
     }
     return list;
@@ -263,7 +264,7 @@ bool hs_token_list_push(hs_token_list_t *list, hs_token_t token) {
         list->capacity *= 2;
         list->items = realloc(list->items, list->capacity * sizeof(hs_token_t));
         if (list->items == NULL) {
-            printf("out of memory during token list reallocation at " SIZE_T_F " tokens :(" ENDLLL, list->size);
+            printf("ERROR: out of memory during token list reallocation at " SIZE_T_F " tokens :(" ENDL, list->size);
             return false;
         }
     }
@@ -314,7 +315,7 @@ hs_token_list_t hs_tokenize(char *input) {
                     i += 2;
                     size_t token_start = i;
                     token_lit.kind = HS_TOKEN_LIT_BIN;
-                    while (((input[i] >= '0' && input[i] <= '1') || input[i] == '.') && i - token_start < BUF_SIZE - 1) {
+                    while (((input[i] >= '0' && input[i] <= '1') || input[i] == '.' || input[i] == '\'') && i - token_start < HS_BUF_SIZE - 1) {
                         token_lit.content[i - token_start] = input[i];
                         i++;
                     }
@@ -327,7 +328,7 @@ hs_token_list_t hs_tokenize(char *input) {
                     i += 2;
                     size_t token_start = i;
                     token_lit.kind = HS_TOKEN_LIT_OCT;
-                    while (((input[i] >= '0' && input[i] <= '7') || input[i] == '.') && i - token_start < BUF_SIZE - 1) {
+                    while (((input[i] >= '0' && input[i] <= '7') || input[i] == '.' || input[i] == '\'') && i - token_start < HS_BUF_SIZE - 1) {
                         token_lit.content[i - token_start] = input[i];
                         i++;
                     }
@@ -340,7 +341,7 @@ hs_token_list_t hs_tokenize(char *input) {
                     i += 2;
                     size_t token_start = i;
                     token_lit.kind = HS_TOKEN_LIT_HEX;
-                    while (((input[i] >= '0' && input[i] <= '9') || (input[i] >= 'a' && input[i] <= 'f') || input[i] == '.') && i - token_start < BUF_SIZE - 1) {
+                    while (((input[i] >= '0' && input[i] <= '9') || (input[i] >= 'a' && input[i] <= 'f') || input[i] == '.' || input[i] == '\'') && i - token_start < HS_BUF_SIZE - 1) {
                         token_lit.content[i - token_start] = input[i];
                         i++;
                     }
@@ -353,18 +354,35 @@ hs_token_list_t hs_tokenize(char *input) {
             }
             size_t token_start = i;
             token_lit.kind = HS_TOKEN_LIT_DEC;
-            while (((input[i] >= '0' && input[i] <= '9') || input[i] == '.') && i - token_start < BUF_SIZE - 1) {
+            while (((input[i] >= '0' && input[i] <= '9') || input[i] == '.' || input[i] == '\'') && i - token_start < HS_BUF_SIZE - 1) {
                 token_lit.content[i - token_start] = input[i];
                 i++;
             }
             token_lit.content[i - token_start] = '\0';
             i--;
+            if (tokens.items[tokens.size - 1].kind == HS_TOKEN_SUBTRACT &&
+               ((tokens.size >= 2 && (tokens.items[tokens.size - 2].kind == HS_TOKEN_OPEN_P ||
+                                     tokens.items[tokens.size - 2].kind == HS_TOKEN_COMMA ||
+                                     tokens.items[tokens.size - 2].kind == HS_TOKEN_ADD ||
+                                     tokens.items[tokens.size - 2].kind == HS_TOKEN_SUBTRACT ||
+                                     tokens.items[tokens.size - 2].kind == HS_TOKEN_MULTIPLY ||
+                                     tokens.items[tokens.size - 2].kind == HS_TOKEN_DIVIDE ||
+                                     tokens.items[tokens.size - 2].kind == HS_TOKEN_MODULO ||
+                                     tokens.items[tokens.size - 2].kind == HS_TOKEN_POWER)) || tokens.size == 1)) {
+                hs_token_list_pop(&tokens);
+                char last_char = '-';
+                for (size_t j = 0; last_char != '\0'; j++) {
+                    char temp = token_lit.content[j];
+                    token_lit.content[j] = last_char;
+                    last_char = temp;
+                }
+            }
             if (!hs_token_list_push(&tokens, token_lit))
                 goto hs_tokenize_error;
         } else if (input[i] >= 'a' && input[i] <= 'z') {
             hs_token_t token_id = {.kind = HS_TOKEN_ID};
             size_t token_start = i;
-            while (((input[i] >= '0' && input[i] <= '9') || (input[i] >= 'a' && input[i] <= 'z')) && i - token_start < BUF_SIZE - 1) {
+            while (((input[i] >= '0' && input[i] <= '9') || (input[i] >= 'a' && input[i] <= 'z')) && i - token_start < HS_BUF_SIZE - 1) {
                 token_id.content[i - token_start] = input[i];
                 i++;
             }
@@ -461,14 +479,14 @@ hs_token_list_t hs_shunting_yard(hs_token_list_t tokens) {
                 break;
             case HS_TOKEN_COMMA:
                 if (stack.size == 0) {
-                    printf("ERROR: unexpected comma" ENDLLL);
+                    printf("ERROR: unexpected comma" ENDL);
                     goto hs_shunting_yard_error;
                 }
                 while (stack.items[stack.size - 1].kind != HS_TOKEN_OPEN_P) {
                     if (!hs_token_list_push(&output, hs_token_list_pop(&stack)))
                         goto hs_shunting_yard_error;
                     if (stack.size == 0) {
-                        printf("ERROR: unexpected comma" ENDLLL);
+                        printf("ERROR: unexpected comma" ENDL);
                         goto hs_shunting_yard_error;
                     }
                 }
@@ -507,12 +525,12 @@ hs_token_list_t hs_shunting_yard(hs_token_list_t tokens) {
                 break;
             case HS_TOKEN_CLOSE_P:
                 if (stack.size == 0) {
-                    printf("ERROR: closing parenthesis without opening one" ENDLLL);
+                    printf("ERROR: closing parenthesis without opening one" ENDL);
                     goto hs_shunting_yard_error;
                 }
                 while (stack.items[stack.size - 1].kind != HS_TOKEN_OPEN_P) {
                     if (stack.size == 0) {
-                        printf("ERROR: closing parenthesis without opening one" ENDLLL);
+                        printf("ERROR: closing parenthesis without opening one" ENDL);
                         goto hs_shunting_yard_error;
                     }
                     if (!hs_token_list_push(&output, hs_token_list_pop(&stack)))
@@ -533,7 +551,7 @@ hs_token_list_t hs_shunting_yard(hs_token_list_t tokens) {
     while (stack.size > 0) {
         hs_token_t stack_token = hs_token_list_pop(&stack);
         if (stack_token.kind == HS_TOKEN_OPEN_P) {
-            printf("ERROR: more opening than closing parentheses" ENDLLL);
+            printf("ERROR: more opening than closing parentheses" ENDL);
             break;
         }
         if (!hs_token_list_push(&output, stack_token))
@@ -564,7 +582,7 @@ hs_value_list_t hs_rpn_list_init() {
         .size = 0,
     };
     if (list.items == NULL) {
-        printf("out of memory during value list initialization :(" ENDLLL);
+        printf("ERROR: out of memory during value list initialization :(" ENDL);
         return list;
     }
     return list;
@@ -575,7 +593,7 @@ bool hs_value_list_push(hs_value_list_t *list, hs_value_t item) {
         list->capacity *= 2;
         list->items = realloc(list->items, list->capacity * sizeof(hs_value_t));
         if (list->items == NULL) {
-            printf("out of memory during value list reallocation at " SIZE_T_F " items :(" ENDLLL, list->size);
+            printf("ERROR: out of memory during value list reallocation at " SIZE_T_F " items :(" ENDL, list->size);
             return false;
         }
     }
@@ -622,40 +640,50 @@ hs_value_t hs_solve(hs_token_list_t tokens, hs_state_t *state) {
             case HS_TOKEN_LIT_OCT:
             case HS_TOKEN_LIT_HEX: {
                 hs_value_t lit_value = HS_ZERO;
-                uint8_t fac = 0;
+                int base = 0;
                 if (tokens.items[i].kind == HS_TOKEN_LIT_DEC) {
-                    fac = 10;
+                    base = 10;
                 } else if (tokens.items[i].kind == HS_TOKEN_LIT_BIN) {
-                    fac = 2;
+                    base = 2;
                 } else if (tokens.items[i].kind == HS_TOKEN_LIT_OCT) {
-                    fac = 8;
+                    base = 8;
                 } else if (tokens.items[i].kind == HS_TOKEN_LIT_HEX) {
-                    fac = 16;
+                    base = 16;
                 }
                 bool frac = false;
-                double frac_fac = 1.0 / fac;
+                double frac_fac = 1.0 / base;
+                bool negative = false;
+                size_t j = 0;
+                if (tokens.items[i].content[0] == '-') {
+                    negative = true;
+                    j++;
+                }
 
-                for (uint16_t j = 0; j < BUF_SIZE && tokens.items[i].content[j] != '\0'; j++) {
+                for (; j < HS_BUF_SIZE && tokens.items[i].content[j] != '\0'; j++) {
                     if (tokens.items[i].content[j] >= '0' && tokens.items[i].content[j] <= '9') {
                         if (!frac) {
-                            lit_value = hs_f_multiply(lit_value, (hs_value_t){.re = fac, .im = 0});
+                            lit_value = hs_f_multiply(lit_value, (hs_value_t){.re = base, .im = 0});
                             lit_value = hs_f_add(lit_value, (hs_value_t){.re = tokens.items[i].content[j] - '0', .im = 0});
                         } else {
                             lit_value = hs_f_add(lit_value, (hs_value_t){.re = frac_fac * (double)(tokens.items[i].content[j] - '0'), .im = 0});
-                            frac_fac /= (double)fac;
+                            frac_fac /= (double)base;
                         }
-                    } else if (tokens.items[i].content[j] >= 'a' && tokens.items[i].content[j] <= 'z' && fac == 16) {
+                    } else if (tokens.items[i].content[j] >= 'a' && tokens.items[i].content[j] <= 'z' && base == 16) {
                         if (!frac) {
-                            lit_value = hs_f_multiply(lit_value, (hs_value_t){.re = fac, .im = 0});
+                            lit_value = hs_f_multiply(lit_value, (hs_value_t){.re = base, .im = 0});
                             lit_value = hs_f_add(lit_value, (hs_value_t){.re = tokens.items[i].content[j] - 'a' + 10, .im = 0});
                         } else {
                             lit_value = hs_f_add(lit_value, (hs_value_t){.re = frac_fac * (double)(tokens.items[i].content[j] - 'a' + 10), .im = 0});
-                            frac_fac /= (double)fac;
+                            frac_fac /= (double)base;
                         }
                     } else if (tokens.items[i].content[j] == '.') {
                         frac = true;
+                    } else if (tokens.items[i].content[j] != '\'') {
+                        printf("WARNING: unexpected token \"%c\" in literal" ENDL, tokens.items[i].content[j]);
                     }
                 }
+                if (negative)
+                    lit_value = (hs_value_t){.re = -lit_value.re, .im = -lit_value.im};
                 if (!hs_value_list_push(&list, lit_value))
                     goto hs_solve_error;
                 break;
@@ -671,7 +699,7 @@ hs_value_t hs_solve(hs_token_list_t tokens, hs_state_t *state) {
                     }
                 }
                 if (!var_found) {
-                    printf("ERROR: var %s not found" ENDLLL, tokens.items[i].content);
+                    printf("ERROR: var %s not found" ENDL, tokens.items[i].content);
                     goto hs_solve_error;
                 }
                 break;
@@ -696,13 +724,13 @@ hs_value_t hs_solve(hs_token_list_t tokens, hs_state_t *state) {
                     }
                 }
                 if (!function_found) {
-                    printf("ERROR: function %s not found" ENDLLL, tokens.items[i].content);
+                    printf("ERROR: function %s not found" ENDL, tokens.items[i].content);
                     goto hs_solve_error;
                 }
                 break;
             }
             case HS_TOKEN_COMMA:
-                printf("ERROR: comma made it to rpn?" ENDLLL);
+                printf("ERROR: comma made it to rpn?" ENDL);
                 goto hs_solve_error;
             case HS_TOKEN_ADD:
                 b = hs_value_list_pop(&list);
@@ -746,11 +774,11 @@ hs_value_t hs_solve(hs_token_list_t tokens, hs_state_t *state) {
     }
 
     if (list.size == 0) {
-        printf("ERROR: something went wrong during rpn calculation" ENDLLL);
+        printf("ERROR: something went wrong during rpn calculation" ENDL);
         goto hs_solve_error;
     } else {
         if (list.size > 1) {
-            printf("WARNING: multiple entries left at end of rpn, which is slightly odd" ENDLLL);
+            printf("WARNING: multiple entries left at end of rpn, which is slightly odd" ENDL);
         }
         result = hs_value_list_pop(&list);
     }
@@ -769,45 +797,100 @@ hs_solve_error:
     return result;
 }
 
-void hs_output_1dim(double value, hs_state_t *state) {
+char hs_1dim_out_buf[64];
+
+void hs_output_1dim_f(double value, hs_state_t *state, int8_t max_digits) {
+    uint32_t hs_1dim_i = 0;
+
+    if (max_digits < 0) {
+        max_digits = HS_MAX_FRAC_DIGITS;
+    }
+
+    if (value <= -HS_EPSILON) {
+        putchar('-');
+        value = -value;
+    }
+    double log_base_2 = 1.0;
     switch (state->output_mode) {
-        case HS_OUTPUT_DEC:
-            if (fabs(value - round(value)) < HS_EPSILON) {
-                printf("%i", (int)(value + (value >= 0 ? 0.5 : -0.5)));
-            } else if (fabs(value) < SCIENT_MIN || fabs(value) >= SCIENT_MAX) {
-                int16_t expo = floor(log10(value) / 3.0) * 3;
-                printf("%.3f * 10^%i", value / pow(10, expo), expo);
-            } else {
-                printf("%f", value);
-            }
-            break;
         case HS_OUTPUT_HEX:
-            if (fabs(value - round(value)) >= HS_EPSILON) {
-                printf("WARNING: no fractional support for hex yet, sorry" ENDLLL);
-            }
-            printf("0x%X", (int)(value + (value >= 0 ? 0.5 : -0.5)));
+            putchar('0');
+            putchar('x');
+            log_base_2 = 1.0 / 4.0;
             break;
         case HS_OUTPUT_OCT:
-            if (fabs(value - round(value)) >= HS_EPSILON) {
-                printf("WARNING: no fractional support for oct yet, sorry" ENDLLL);
-            }
-            printf("0o%o", (int)(value + (value >= 0 ? 0.5 : -0.5)));
+            putchar('0');
+            putchar('o');
+            log_base_2 = 1.0 / 3.0;
+            break;
+        case HS_OUTPUT_DEC:
+            log_base_2 = 0.301029995664;
             break;
         case HS_OUTPUT_BIN:
-            if (fabs(value - round(value)) >= HS_EPSILON) {
-                printf("WARNING: no fractional support for bin yet, sorry" ENDLLL);
-            }
-            int64_t value_i = (int)(value + (value >= 0 ? 0.5 : -0.5));
             putchar('0');
             putchar('b');
-            for (int32_t i = log2(value_i); i >= 0; i--) {
-                if ((value_i >> i) & 1) {
-                    putchar('1');
-                } else {
-                    putchar('0');
-                }
-            }
+            log_base_2 = 1.0;
             break;
+    }
+    int32_t highest_digit = (int32_t)(log2(value) * log_base_2) + 1;
+    if (highest_digit < 0) {
+        highest_digit = 0;
+    }
+    double value_of_digit = pow((int)state->output_mode, highest_digit);
+    bool has_trailing = false;
+    for (int32_t i = highest_digit; (fabs(value) >= HS_EPSILON && i > -max_digits) || i >= 0; i--) {
+        int digit = (int)(value / value_of_digit + 0.001);
+        if (digit >= 0 && digit < 10) {
+            hs_1dim_out_buf[hs_1dim_i++] = '0' + digit;
+        } else if (digit >= 0 && digit < 16) {
+            hs_1dim_out_buf[hs_1dim_i++] = 'A' + digit - 10;
+        } else {
+            break;
+        }
+        value -= digit * value_of_digit;
+        if (i == 0) {
+            hs_1dim_out_buf[hs_1dim_i++] = '.';
+            has_trailing = true;
+        }
+        value_of_digit /= (int)state->output_mode;
+    }
+    hs_1dim_out_buf[hs_1dim_i] = '\0';
+
+    if (has_trailing) {
+        for (hs_1dim_i--; hs_1dim_i > 0; hs_1dim_i--) {
+            if (hs_1dim_out_buf[hs_1dim_i] != '0') {
+                if (hs_1dim_out_buf[hs_1dim_i] == '.') {
+                    hs_1dim_i--;
+                }
+                break;
+            }
+        }
+    }
+
+    size_t trailing_zeros_start = hs_1dim_i;
+    bool leading_done = false;
+    for (hs_1dim_i = 0; hs_1dim_i <= trailing_zeros_start; hs_1dim_i++) {
+        if (hs_1dim_out_buf[hs_1dim_i] != '0' || leading_done) {
+            putchar(hs_1dim_out_buf[hs_1dim_i]);
+            leading_done = true;
+        }
+    }
+}
+
+void hs_output_1dim(double value, hs_state_t *state) {
+    if ((fabs(value) < HS_SCIENT_MIN || fabs(value) >= HS_SCIENT_MAX) && state->output_mode == HS_OUTPUT_DEC) {
+        // scientific output
+        int16_t expo = floor(log10(value) / 3.0) * 3;
+        hs_output_1dim_f(value / pow(10, expo), state, 3);
+        putchar(' ');
+        putchar('*');
+        putchar(' ');
+        putchar('1');
+        putchar('0');
+        putchar('^');
+        hs_output_1dim_f(expo, state, 0);
+    } else {
+        // normal output
+        hs_output_1dim_f(value, state, -1);
     }
 }
 
@@ -817,12 +900,14 @@ void hs_output(hs_value_t value, hs_state_t *state) {
     } else {
         putchar('(');
         hs_output_1dim(value.re, state);
+        putchar(' ');
         putchar('+');
+        putchar(' ');
         hs_output_1dim(value.im, state);
         putchar('i');
         putchar(')');
     }
-    printf(ENDLLL);
+    printf(ENDL);
 }
 
 hs_state_t temp_state;
@@ -898,7 +983,7 @@ int main(int argc, char *argv[]) {
                     hs_input_size *= 2;
                     hs_input = realloc(hs_input, hs_input_size);
                     if (hs_input == NULL) {
-                        printf("out of memory while reading input :(" ENDLLL);
+                        printf("ERROR: out of memory while reading input :(" ENDL);
                         return 1;
                     }
                 }
@@ -918,7 +1003,7 @@ int main(int argc, char *argv[]) {
                     hs_input_size *= 2;
                     hs_input = realloc(hs_input, hs_input_size);
                     if (hs_input == NULL) {
-                        printf("out of memory while reading input :(" ENDLLL);
+                        printf("ERROR: out of memory while reading input :(" ENDL);
                         return 1;
                     }
                 }
@@ -926,7 +1011,6 @@ int main(int argc, char *argv[]) {
             hs_input[hs_input_i] = '\0';
 
             if (hs_input_i == 0) {
-                printf("i hath not acknowledged input of any sorts, hence i will embark" ENDLLL);
                 break;
             }
             hs_run(hs_input, &state);
