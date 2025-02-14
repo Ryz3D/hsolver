@@ -1,8 +1,8 @@
+#include <stdio.h>
+#include <stdint.h>
+#include <stdbool.h>
 #include <malloc.h>
 #include <math.h>
-#include <stdbool.h>
-#include <stdint.h>
-#include <stdio.h>
 
 #define SCIENT_MIN 0.01
 #define SCIENT_MAX 10000
@@ -10,17 +10,17 @@
 #define HS_EPSILON 1e-20
 
 #ifdef WIN
-#define ENDL "\r\n"
-#define SIZE_T_F "%llu"
+#define ENDLLL "\r\n"
+#define SIZE_T_F "%i"
 #endif
 #ifdef UNIX
-#define ENDL "\n"
+#define ENDLLL "\n"
 #define SIZE_T_F "%lu"
 #endif
 
-#ifndef ENDL
+#ifndef ENDLLL
 #warning "Please specify platform using -D WIN or -D UNIX"
-#define ENDL "\n"
+#define ENDLLL "\n"
 #endif
 #ifndef SIZE_T_F
 #define SIZE_T_F "%lu"
@@ -71,7 +71,7 @@ hs_value_t hs_f_multiply(hs_value_t a, hs_value_t b) {
 
 hs_value_t hs_f_divide(hs_value_t a, hs_value_t b) {
     if (hs_f_abs(b, HS_ZERO).re < HS_EPSILON) {
-        printf("ERROR: division by zero" ENDL);
+        printf("ERROR: division by zero" ENDLLL);
         return (hs_value_t){.re = NAN, .im = NAN};
     }
     return (hs_value_t){.re = (a.re * b.re + a.im * b.im) / (b.re * b.re + b.im * b.im), .im = (a.im * b.re - a.re * b.im) / (b.re * b.re + b.im * b.im)};
@@ -99,7 +99,7 @@ hs_value_t hs_f_modulo(hs_value_t a, hs_value_t b) {
 
 hs_value_t hs_f_pow(hs_value_t a, hs_value_t b) {
     if (fabs(a.im) >= HS_EPSILON || fabs(b.im) >= HS_EPSILON) {
-        printf("ERROR: i'm sorry dave, i can't let you do that with complex numbers" ENDL);
+        printf("ERROR: i'm sorry dave, i can't let you do that with complex numbers" ENDLLL);
         return (hs_value_t){.re = NAN, .im = NAN};
     }
     return (hs_value_t){.re = pow(a.re, b.re), .im = 0};
@@ -107,7 +107,7 @@ hs_value_t hs_f_pow(hs_value_t a, hs_value_t b) {
 
 hs_value_t hs_f_root(hs_value_t a, hs_value_t b) {
     if (fabs(a.im) >= HS_EPSILON || fabs(b.im) >= HS_EPSILON) {
-        printf("ERROR: i'm sorry dave, i can't let you do that with complex numbers" ENDL);
+        printf("ERROR: i'm sorry dave, i can't let you do that with complex numbers" ENDLLL);
         return (hs_value_t){.re = NAN, .im = NAN};
     }
     return hs_f_pow(a, hs_f_divide(HS_ONE, b));
@@ -128,7 +128,7 @@ hs_value_t hs_f_ln(hs_value_t a, hs_value_t b) {
 
 hs_value_t hs_f_log2(hs_value_t a, hs_value_t b) {
     if (fabs(a.im) >= HS_EPSILON) {
-        printf("ERROR: i'm sorry dave, i can't let you do that with complex numbers" ENDL);
+        printf("ERROR: i'm sorry dave, i can't let you do that with complex numbers" ENDLLL);
         return (hs_value_t){.re = NAN, .im = NAN};
     }
     return (hs_value_t){.re = log2(a.re), .im = 0};
@@ -136,7 +136,7 @@ hs_value_t hs_f_log2(hs_value_t a, hs_value_t b) {
 
 hs_value_t hs_f_log10(hs_value_t a, hs_value_t b) {
     if (fabs(a.im) >= HS_EPSILON) {
-        printf("ERROR: i'm sorry dave, i can't let you do that with complex numbers" ENDL);
+        printf("ERROR: i'm sorry dave, i can't let you do that with complex numbers" ENDLLL);
         return (hs_value_t){.re = NAN, .im = NAN};
     }
     return (hs_value_t){.re = log10(a.re), .im = 0};
@@ -184,13 +184,18 @@ typedef struct hs_state {
 hs_state_t hs_default_state() {
     hs_state_t state = {
         .context_vars = malloc(sizeof(hs_default_vars)),
-        .context_vars_length = sizeof(hs_default_vars) / sizeof(hs_var_t),
+        .context_vars_length = sizeof(hs_default_vars) / sizeof(hs_var_t) + 1,
         .context_funcs = malloc(sizeof(hs_default_funcs)),
         .context_funcs_length = sizeof(hs_default_funcs) / sizeof(hs_func_t),
         .output_mode = HS_OUTPUT_DEC,
     };
-    for (size_t i = 0; i < state.context_vars_length; i++) {
-        state.context_vars[i] = hs_default_vars[i];
+    state.context_vars[0].id[0] = 'a';
+    state.context_vars[0].id[1] = 'n';
+    state.context_vars[0].id[2] = 's';
+    state.context_vars[0].id[3] = '\0';
+    state.context_vars[0].value = HS_ZERO;
+    for (size_t i = 0; i < sizeof(hs_default_vars) / sizeof(hs_var_t); i++) {
+        state.context_vars[i + 1] = hs_default_vars[i];
     }
     for (size_t i = 0; i < state.context_funcs_length; i++) {
         state.context_funcs[i] = hs_default_funcs[i];
@@ -244,7 +249,7 @@ hs_token_list_t hs_token_list_init() {
         .size = 0,
     };
     if (list.items == NULL) {
-        printf("out of memory during token list initialization :(" ENDL);
+        printf("out of memory during token list initialization :(" ENDLLL);
         return list;
     }
     return list;
@@ -255,7 +260,7 @@ bool hs_token_list_push(hs_token_list_t *list, hs_token_t token) {
         list->capacity *= 2;
         list->items = realloc(list->items, list->capacity * sizeof(hs_token_t));
         if (list->items == NULL) {
-            printf("out of memory during token list reallocation at " SIZE_T_F " tokens :(" ENDL, list->size);
+            printf("out of memory during token list reallocation at " SIZE_T_F " tokens :(" ENDLLL, list->size);
             return false;
         }
     }
@@ -279,23 +284,23 @@ hs_token_list_t hs_tokenize(char *input) {
 
     for (size_t i = 0; input[i] != '\0'; i++) {
         if (input[i] == '+') {
-            hs_token_list_push(&tokens, (hs_token_t){.kind = HS_TOKEN_ADD});
+            if (!hs_token_list_push(&tokens, (hs_token_t){.kind = HS_TOKEN_ADD})) return tokens;
         } else if (input[i] == '-') {
-            hs_token_list_push(&tokens, (hs_token_t){.kind = HS_TOKEN_SUBTRACT});
+            if (!hs_token_list_push(&tokens, (hs_token_t){.kind = HS_TOKEN_SUBTRACT})) return tokens;
         } else if (input[i] == '*') {
-            hs_token_list_push(&tokens, (hs_token_t){.kind = HS_TOKEN_MULTIPLY});
+            if (!hs_token_list_push(&tokens, (hs_token_t){.kind = HS_TOKEN_MULTIPLY})) return tokens;
         } else if (input[i] == '/') {
-            hs_token_list_push(&tokens, (hs_token_t){.kind = HS_TOKEN_DIVIDE});
+            if (!hs_token_list_push(&tokens, (hs_token_t){.kind = HS_TOKEN_DIVIDE})) return tokens;
         } else if (input[i] == '%') {
-            hs_token_list_push(&tokens, (hs_token_t){.kind = HS_TOKEN_MODULO});
+            if (!hs_token_list_push(&tokens, (hs_token_t){.kind = HS_TOKEN_MODULO})) return tokens;
         } else if (input[i] == '^') {
-            hs_token_list_push(&tokens, (hs_token_t){.kind = HS_TOKEN_POWER});
+            if (!hs_token_list_push(&tokens, (hs_token_t){.kind = HS_TOKEN_POWER})) return tokens;
         } else if (input[i] == '(') {
-            hs_token_list_push(&tokens, (hs_token_t){.kind = HS_TOKEN_OPEN_P});
+            if (!hs_token_list_push(&tokens, (hs_token_t){.kind = HS_TOKEN_OPEN_P})) return tokens;
         } else if (input[i] == ')') {
-            hs_token_list_push(&tokens, (hs_token_t){.kind = HS_TOKEN_CLOSE_P});
+            if (!hs_token_list_push(&tokens, (hs_token_t){.kind = HS_TOKEN_CLOSE_P})) return tokens;
         } else if (input[i] == ',') {
-            hs_token_list_push(&tokens, (hs_token_t){.kind = HS_TOKEN_COMMA});
+            if (!hs_token_list_push(&tokens, (hs_token_t){.kind = HS_TOKEN_COMMA})) return tokens;
         } else if ((input[i] >= '0' && input[i] <= '9') || input[i] == '.') {
             hs_token_t token_lit;
             if (input[i] == '0') {
@@ -433,13 +438,13 @@ hs_token_list_t hs_shunting_yard(hs_token_list_t tokens) {
                 break;
             case HS_TOKEN_COMMA:
                 if (stack.size == 0) {
-                    printf("ERROR: unexpected comma" ENDL);
+                    printf("ERROR: unexpected comma" ENDLLL);
                     break;
                 }
                 while (stack.items[stack.size - 1].kind != HS_TOKEN_OPEN_P) {
                     hs_token_list_push(&output, hs_token_list_pop(&stack));
                     if (stack.size == 0) {
-                        printf("ERROR: unexpected comma" ENDL);
+                        printf("ERROR: unexpected comma" ENDLLL);
                         break;
                     }
                 }
@@ -473,12 +478,12 @@ hs_token_list_t hs_shunting_yard(hs_token_list_t tokens) {
                 break;
             case HS_TOKEN_CLOSE_P:
                 if (stack.size == 0) {
-                    printf("ERROR: closing parenthesis without opening one" ENDL);
+                    printf("ERROR: closing parenthesis without opening one" ENDLLL);
                     break;
                 }
                 while (stack.items[stack.size - 1].kind != HS_TOKEN_OPEN_P) {
                     if (stack.size == 0) {
-                        printf("ERROR: closing parenthesis without opening one" ENDL);
+                        printf("ERROR: closing parenthesis without opening one" ENDLLL);
                         break;
                     }
                     hs_token_list_push(&output, hs_token_list_pop(&stack));
@@ -497,7 +502,7 @@ hs_token_list_t hs_shunting_yard(hs_token_list_t tokens) {
     while (stack.size > 0) {
         hs_token_t stack_token = hs_token_list_pop(&stack);
         if (stack_token.kind == HS_TOKEN_OPEN_P) {
-            printf("ERROR: more opening than closing parentheses" ENDL);
+            printf("ERROR: more opening than closing parentheses" ENDLLL);
             break;
         }
         // TODO: check if push even worked, otherwise fuck off (everywhere)
@@ -522,7 +527,7 @@ hs_value_list_t hs_rpn_list_init() {
         .size = 0,
     };
     if (list.items == NULL) {
-        printf("out of memory during value list initialization :(" ENDL);
+        printf("out of memory during value list initialization :(" ENDLLL);
         return list;
     }
     return list;
@@ -533,7 +538,7 @@ bool hs_value_list_push(hs_value_list_t *list, hs_value_t item) {
         list->capacity *= 2;
         list->items = realloc(list->items, list->capacity * sizeof(hs_value_t));
         if (list->items == NULL) {
-            printf("out of memory during value list reallocation at " SIZE_T_F " items :(" ENDL, list->size);
+            printf("out of memory during value list reallocation at " SIZE_T_F " items :(" ENDLLL, list->size);
             return false;
         }
     }
@@ -622,7 +627,7 @@ hs_value_t hs_solve(hs_token_list_t tokens, hs_state_t *state) {
                     }
                 }
                 if (!var_found) {
-                    printf("ERROR: var %s not found" ENDL, tokens.items[i].content);
+                    printf("ERROR: var %s not found" ENDLLL, tokens.items[i].content);
                 }
                 break;
             }
@@ -645,12 +650,12 @@ hs_value_t hs_solve(hs_token_list_t tokens, hs_state_t *state) {
                     }
                 }
                 if (!function_found) {
-                    printf("ERROR: function %s not found" ENDL, tokens.items[i].content);
+                    printf("ERROR: function %s not found" ENDLLL, tokens.items[i].content);
                 }
                 break;
             }
             case HS_TOKEN_COMMA:
-                printf("ERROR: comma made it to rpn?" ENDL);
+                printf("ERROR: comma made it to rpn?" ENDLLL);
                 break;
             case HS_TOKEN_ADD:
                 b = hs_value_list_pop(&list);
@@ -689,10 +694,10 @@ hs_value_t hs_solve(hs_token_list_t tokens, hs_state_t *state) {
 
     hs_value_t result = HS_ZERO;
     if (list.size == 0) {
-        printf("ERROR: something went wrong during rpn calculation" ENDL);
+        printf("ERROR: something went wrong during rpn calculation" ENDLLL);
     } else {
         if (list.size > 1) {
-            printf("WARNING: multiple entries left at end of rpn, which is slightly odd" ENDL);
+            printf("WARNING: multiple entries left at end of rpn, which is slightly odd" ENDLLL);
         }
         result = hs_value_list_pop(&list);
     }
@@ -716,19 +721,19 @@ void hs_output_1dim(double value, hs_state_t *state) {
             break;
         case HS_OUTPUT_HEX:
             if (fabs(value - round(value)) >= HS_EPSILON) {
-                printf("WARNING: no fractional support for hex yet, sorry" ENDL);
+                printf("WARNING: no fractional support for hex yet, sorry" ENDLLL);
             }
             printf("0x%X", (int)(value + (value >= 0 ? 0.5 : -0.5)));
             break;
         case HS_OUTPUT_OCT:
             if (fabs(value - round(value)) >= HS_EPSILON) {
-                printf("WARNING: no fractional support for oct yet, sorry" ENDL);
+                printf("WARNING: no fractional support for oct yet, sorry" ENDLLL);
             }
             printf("0o%o", (int)(value + (value >= 0 ? 0.5 : -0.5)));
             break;
         case HS_OUTPUT_BIN:
             if (fabs(value - round(value)) >= HS_EPSILON) {
-                printf("WARNING: no fractional support for bin yet, sorry" ENDL);
+                printf("WARNING: no fractional support for bin yet, sorry" ENDLLL);
             }
             int64_t value_i = (int)(value + (value >= 0 ? 0.5 : -0.5));
             putchar('0');
@@ -755,7 +760,7 @@ void hs_output(hs_value_t value, hs_state_t *state) {
         putchar('i');
         putchar(')');
     }
-    printf(ENDL);
+    printf(ENDLLL);
 }
 
 hs_state_t temp_state;
@@ -792,7 +797,8 @@ void hs_run(char *input, hs_state_t *state) {
     hs_token_list_t tokens3 = hs_shunting_yard(tokens2);
     free(tokens2.items);
     if (tokens3.size > 0) {
-        hs_value_t result = hs_solve(tokens3, state);
+        // assuming the first context_var is "ans"
+        hs_value_t result = state->context_vars[0].value = hs_solve(tokens3, state);
         free(tokens3.items);
         hs_output(result, state);
     }
@@ -815,7 +821,7 @@ int main(int argc, char *argv[]) {
                     hs_input_size *= 2;
                     hs_input = realloc(hs_input, hs_input_size);
                     if (hs_input == NULL) {
-                        printf("out of memory while reading input :(" ENDL);
+                        printf("out of memory while reading input :(" ENDLLL);
                         return 1;
                     }
                 }
@@ -835,7 +841,7 @@ int main(int argc, char *argv[]) {
                     hs_input_size *= 2;
                     hs_input = realloc(hs_input, hs_input_size);
                     if (hs_input == NULL) {
-                        printf("out of memory while reading input :(" ENDL);
+                        printf("out of memory while reading input :(" ENDLLL);
                         return 1;
                     }
                 }
@@ -843,6 +849,7 @@ int main(int argc, char *argv[]) {
             hs_input[hs_input_i] = '\0';
 
             if (hs_input_i == 0) {
+                printf("i hath not acknowledged input of any sorts, hence i will embark" ENDLLL);
                 break;
             }
             hs_run(hs_input, &state);
