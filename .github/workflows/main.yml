@@ -7,7 +7,7 @@ jobs:
       - name: Check out code
         uses: actions/checkout@v4
       - name: Compile
-        run: gcc -std=c2x -Wall hsolver.c -o ./hsolver
+        run: gcc -std=c2x -Wall hsolver.c -o ./hsolver -lm
       - name: Upload binary
         uses: actions/upload-artifact@v4.6.0
         with:
