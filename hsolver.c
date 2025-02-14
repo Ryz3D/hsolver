@@ -22,7 +22,8 @@
 #warning "Please specify platform using -D WIN or -D UNIX"
 #define ENDL "\n"
 #endif
-#ifndef SIZE_T_F "%lu"
+#ifndef SIZE_T_F
+#define SIZE_T_F "%lu"
 #endif
 
 #define HS_ZERO ((hs_value_t){.re = 0, .im = 0})
