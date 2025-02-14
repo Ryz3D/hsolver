@@ -14,7 +14,7 @@ jobs:
           name: hsolver
           path: ./hsolver
   build-win:
-    runs-on: windows
+    runs-on: windows-latest
     steps:
       - name: Check out code
         uses: actions/checkout@v4
