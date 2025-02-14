@@ -4,12 +4,26 @@
 #include <stdint.h>
 #include <stdio.h>
 
-#define ENDL "\r\n"
-#define SIZE_T_F "%lu"
 #define SCIENT_MIN 0.01
 #define SCIENT_MAX 10000
 #define BUF_SIZE 64
 #define HS_EPSILON 1e-20
+
+#ifdef WIN
+#define ENDL "\r\n"
+#define SIZE_T_F "%llu"
+#endif
+#ifdef UNIX
+#define ENDL "\n"
+#define SIZE_T_F "%lu"
+#endif
+
+#ifndef ENDL
+#warning "Please specify platform using -D WIN or -D UNIX"
+#define ENDL "\n"
+#endif
+#ifndef SIZE_T_F "%lu"
+#endif
 
 #define HS_ZERO ((hs_value_t){.re = 0, .im = 0})
 #define HS_ONE ((hs_value_t){.re = 1, .im = 0})
