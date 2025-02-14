@@ -705,15 +705,13 @@ hs_value_t hs_solve(hs_token_list_t tokens, hs_state_t *state) {
 void hs_output_1dim(double value, hs_state_t *state) {
     switch (state->output_mode) {
         case HS_OUTPUT_DEC:
-            if (fabs(value) < SCIENT_MIN || fabs(value) >= SCIENT_MAX) {
+            if (fabs(value - round(value)) < HS_EPSILON) {
+                printf("%i", (int)(value + (value >= 0 ? 0.5 : -0.5)));
+            } else if (fabs(value) < SCIENT_MIN || fabs(value) >= SCIENT_MAX) {
                 int16_t expo = floor(log10(value) / 3.0) * 3;
                 printf("%.3f * 10^%i", value / pow(10, expo), expo);
             } else {
-                if (fabs(value - round(value)) < HS_EPSILON) {
-                    printf("%i", (int)(value + (value >= 0 ? 0.5 : -0.5)));
-                } else {
-                    printf("%f", value);
-                }
+                printf("%f", value);
             }
             break;
         case HS_OUTPUT_HEX:
