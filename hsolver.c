@@ -4,8 +4,9 @@
 #include <malloc.h>
 #include <math.h>
 
-// TODO: negative literals
-// TODO: custom variables and custom functions to context (funcs must start with letter)
+// TODO:
+//  - custom variables and custom functions to context (funcs must start with letter)
+//  - console colors/bold (especially "list")
 
 #define HS_SCIENT_MIN 0.01
 #define HS_SCIENT_MAX 10000
@@ -55,6 +56,10 @@ hs_var_t hs_default_vars[] = {
     {.id = "tau", .value = {.re = 6.283185307179586476925286766559005768394338798, .im = 0}},
     {.id = "phi", .value = {.re = 1.618033988749894848204586834365638117720309179, .im = 0}},
     {.id = "c", .value = {.re = 299792458, .im = 0}},
+    {.id = "g", .value = {.re = 9.80665, .im = 0}},
+    {.id = "ev", .value = {.re = 1.602176634e-19, .im = 0}},
+    {.id = "mu_0", .value = {.re = 1.25663706127e-6, .im = 0}},
+    {.id = "epsi_0", .value = {.re = 8.8541878188e-12, .im = 0}},
 };
 
 hs_value_t hs_f_abs(hs_value_t a, hs_value_t b) {
@@ -388,7 +393,7 @@ hs_token_list_t hs_tokenize(char *input) {
         } else if (input[i] >= 'a' && input[i] <= 'z') {
             hs_token_t token_id = {.kind = HS_TOKEN_ID};
             size_t token_start = i;
-            while (((input[i] >= '0' && input[i] <= '9') || (input[i] >= 'a' && input[i] <= 'z')) && i - token_start < HS_BUF_SIZE - 1) {
+            while (((input[i] >= '0' && input[i] <= '9') || (input[i] >= 'a' && input[i] <= 'z') || input[i] == '_') && i - token_start < HS_BUF_SIZE - 1) {
                 token_id.content[i - token_start] = input[i];
                 i++;
             }
@@ -619,7 +624,7 @@ hs_value_t hs_value_list_pop(hs_value_list_t *list) {
     }
 }
 
-bool str_same(char *a, char *b) {
+bool hs_str_same(char *a, char *b) {
     size_t i = 0;
     while (a[i] != '\0' && b[i] != '\0') {
         if (a[i] != b[i]) {
@@ -628,6 +633,13 @@ bool str_same(char *a, char *b) {
         i++;
     }
     return a[i] == '\0' && b[i] == '\0';
+}
+
+size_t hs_str_len(char *a) {
+    size_t i = 0;
+    while (a[i] != '\0')
+        i++;
+    return i;
 }
 
 hs_value_t hs_solve(hs_token_list_t tokens, hs_state_t *state) {
@@ -697,7 +709,7 @@ hs_value_t hs_solve(hs_token_list_t tokens, hs_state_t *state) {
             case HS_TOKEN_ID_IS_VAR: {
                 bool var_found = false;
                 for (size_t j = 0; j < state->context_vars_length; j++) {
-                    if (str_same(tokens.items[i].content, state->context_vars[j].id)) {
+                    if (hs_str_same(tokens.items[i].content, state->context_vars[j].id)) {
                         if (!hs_value_list_push(&list, state->context_vars[j].value))
                             goto hs_solve_error;
                         var_found = true;
@@ -713,7 +725,7 @@ hs_value_t hs_solve(hs_token_list_t tokens, hs_state_t *state) {
             case HS_TOKEN_ID: {
                 bool function_found = false;
                 for (size_t j = 0; j < state->context_funcs_length; j++) {
-                    if (str_same(tokens.items[i].content, state->context_funcs[j].id)) {
+                    if (hs_str_same(tokens.items[i].content, state->context_funcs[j].id)) {
                         hs_value_t return_value;
                         if (state->context_funcs[j].params == 1) {
                             a = hs_value_list_pop(&list);
@@ -851,7 +863,7 @@ void hs_output_1dim_f(double value, hs_state_t *state, int8_t max_digits) {
     }
     double value_of_digit = pow((int)state->settings.output_mode, highest_digit);
     bool has_trailing = false;
-    for (int32_t i = highest_digit; (fabs(value) >= HS_EPSILON && i > -max_digits) || i >= 0; i--) {
+    for (int32_t i = highest_digit; (fabs(value) >= HS_EPSILON && i > -max_digits - 1) || i >= 0; i--) {
         int digit = (int)(value / value_of_digit + 0.001);
         if (digit >= 0 && digit < 10) {
             hs_1dim_out_buf[hs_1dim_i++] = '0' + digit;
@@ -935,7 +947,6 @@ void hs_output(hs_value_t value, hs_state_t *state) {
         putchar('i');
         putchar(')');
     }
-    printf(ENDL);
 }
 
 hs_state_t temp_state;
@@ -962,19 +973,76 @@ void hs_run(char *input, hs_state_t *state) {
         goto hs_run_error;
     for (size_t i = 0; i < tokens1.size; i++) {
         if (tokens1.items[i].kind == HS_TOKEN_ID) {
-            if (str_same(tokens1.items[i].content, "dec")) {
+            if (hs_str_same(tokens1.items[i].content, "list")) {
+                size_t len_func = 0;
+                size_t len_var = 0;
+                
+                for (size_t j = 0; j < state->context_funcs_length; j++) {
+                    size_t len = hs_str_len(state->context_funcs[j].id) + 3 + state->context_funcs[j].params * 3;
+                    len_func = len > len_func ? len : len_func;
+                }
+                for (size_t j = 0; j < state->context_vars_length; j++) {
+                    size_t len = hs_str_len(state->context_vars[j].id) + 2;
+                    len_var = len > len_var ? len : len_var;
+                }
+
+                const char *funcs = "FUNCS";
+                const char *vars = "VARS";
+                printf("--%s", funcs);
+                for (size_t s = 0; s <= len_func - (hs_str_len((char *)funcs) + 2); s++) {
+                    putchar('-');
+                }
+                printf("|--%s", vars);
+                for (size_t s = 0; s <= len_var + 2 + HS_MAX_FRAC_DIGITS - hs_str_len((char *)vars); s++) {
+                    putchar('-');
+                }
+                printf(ENDL);
+
+                for (size_t j = 0; j < state->context_vars_length || j < state->context_funcs_length; j++) {
+                    if (j < state->context_funcs_length) {
+                        printf("  %s(", state->context_funcs[j].id);
+                        for (uint8_t p = 0; p < state->context_funcs[j].params; p++) {
+                            putchar('a' + p);
+                            if (p < state->context_funcs[j].params - 1) {
+                                putchar(',');
+                                putchar(' ');
+                            }
+                        }
+                        putchar(')');
+                        for (size_t s = 0; s <= len_func - (hs_str_len(state->context_funcs[j].id) + 2 + state->context_funcs[j].params * 3); s++) {
+                            putchar(' ');
+                        }
+                    } else {
+                        for (size_t s = 0; s <= len_func; s++) {
+                            putchar(' ');
+                        }
+                    }
+                    putchar('|');
+                    if (j < state->context_vars_length) {
+                        printf("  %s", state->context_vars[j].id);
+                        for (size_t s = 0; s <= len_var - (hs_str_len(state->context_vars[j].id) + 2); s++) {
+                            putchar(' ');
+                        }
+                        putchar('=');
+                        putchar(' ');
+                        hs_output(state->context_vars[j].value, state);
+                    }
+                    printf(ENDL);
+                }
+                continue;
+            } else if (hs_str_same(tokens1.items[i].content, "dec")) {
                 state->settings.output_mode = HS_OUTPUT_DEC;
                 restore_settings = true;
                 continue;
-            } else if (str_same(tokens1.items[i].content, "hex")) {
+            } else if (hs_str_same(tokens1.items[i].content, "hex")) {
                 state->settings.output_mode = HS_OUTPUT_HEX;
                 restore_settings = true;
                 continue;
-            } else if (str_same(tokens1.items[i].content, "oct")) {
+            } else if (hs_str_same(tokens1.items[i].content, "oct")) {
                 state->settings.output_mode = HS_OUTPUT_OCT;
                 restore_settings = true;
                 continue;
-            } else if (str_same(tokens1.items[i].content, "bin")) {
+            } else if (hs_str_same(tokens1.items[i].content, "bin")) {
                 state->settings.output_mode = HS_OUTPUT_BIN;
                 restore_settings = true;
                 continue;
@@ -998,6 +1066,7 @@ void hs_run(char *input, hs_state_t *state) {
         hs_value_t result = state->context_vars[0].value = hs_solve(tokens3, state);
         free(tokens3.items);
         hs_output(result, state);
+        printf(ENDL);
     }
     if (restore_settings)
         state->settings = temp_settings;
