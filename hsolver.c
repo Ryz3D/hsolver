@@ -7,7 +7,7 @@
 // TODO:
 //  - custom variables and custom functions to context (funcs must start with letter)
 //  - console colors/bold (especially "list")
-//  - settings for scient_min/_max & sep_char_in/_out
+//  - settings for scient_min/_max & sep_char_in/_out & sep_on/_off
 
 #define HS_SCIENT_MIN 0.01
 #define HS_SCIENT_MAX 10000
