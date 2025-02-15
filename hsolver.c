@@ -7,6 +7,7 @@
 // TODO:
 //  - custom variables and custom functions to context (funcs must start with letter)
 //  - console colors/bold (especially "list")
+//  - sep_on/sep_off ->hs_settings_t
 
 #define HS_SCIENT_MIN 0.01
 #define HS_SCIENT_MAX 10000
