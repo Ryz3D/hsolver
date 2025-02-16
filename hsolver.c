@@ -7,15 +7,19 @@
 // TODO:
 //  - custom variables and custom functions to context (funcs must start with letter)
 //  - console colors/bold (especially "list")
-//  - settings for scient_min/_max & sep_char_in/_out & sep_on/_off
+//  - commands for scient_min/_max & sep_char_in/_out & sep_on/_off (could be set like hs_var_t)
 
-#define HS_SCIENT_MIN 0.01
-#define HS_SCIENT_MAX 10000
-#define SEP_CHAR_IN '\''
-#define SEP_CHAR_OUT '\''
 #define HS_MAX_FRAC_DIGITS 13
 #define HS_BUF_SIZE 64
 #define HS_EPSILON 1e-20
+
+const double hs_scient_min = 0.01;
+const double hs_scient_max = 10000;
+const char hs_dec_sep_char_in = '.';
+const char hs_dec_sep_char_out = '.';
+const bool hs_sep_out = true;
+const char hs_sep_char_in = '\'';
+const char hs_sep_char_out = '\'';
 
 #ifdef WIN
 #define ENDL "\r\n"
@@ -322,14 +326,14 @@ hs_token_list_t hs_tokenize(char *input) {
             if (!hs_token_list_push(&tokens, (hs_token_t){.kind = HS_TOKEN_CLOSE_P})) goto hs_tokenize_error;
         } else if (input[i] == ',') {
             if (!hs_token_list_push(&tokens, (hs_token_t){.kind = HS_TOKEN_COMMA})) goto hs_tokenize_error;
-        } else if ((input[i] >= '0' && input[i] <= '9') || input[i] == '.') {
+        } else if ((input[i] >= '0' && input[i] <= '9') || input[i] == hs_dec_sep_char_in) {
             hs_token_t token_lit;
             if (input[i] == '0') {
                 if (input[i + 1] == 'b') {
                     i += 2;
                     size_t token_start = i;
                     token_lit.kind = HS_TOKEN_LIT_BIN;
-                    while (((input[i] >= '0' && input[i] <= '1') || input[i] == '.' || input[i] == SEP_CHAR_IN) && i - token_start < HS_BUF_SIZE - 1) {
+                    while (((input[i] >= '0' && input[i] <= '1') || input[i] == hs_dec_sep_char_in || input[i] == hs_sep_char_in) && i - token_start < HS_BUF_SIZE - 1) {
                         token_lit.content[i - token_start] = input[i];
                         i++;
                     }
@@ -342,7 +346,7 @@ hs_token_list_t hs_tokenize(char *input) {
                     i += 2;
                     size_t token_start = i;
                     token_lit.kind = HS_TOKEN_LIT_OCT;
-                    while (((input[i] >= '0' && input[i] <= '7') || input[i] == '.' || input[i] == SEP_CHAR_IN) && i - token_start < HS_BUF_SIZE - 1) {
+                    while (((input[i] >= '0' && input[i] <= '7') || input[i] == hs_dec_sep_char_in || input[i] == hs_sep_char_in) && i - token_start < HS_BUF_SIZE - 1) {
                         token_lit.content[i - token_start] = input[i];
                         i++;
                     }
@@ -355,7 +359,7 @@ hs_token_list_t hs_tokenize(char *input) {
                     i += 2;
                     size_t token_start = i;
                     token_lit.kind = HS_TOKEN_LIT_HEX;
-                    while (((input[i] >= '0' && input[i] <= '9') || (input[i] >= 'a' && input[i] <= 'f') || input[i] == '.' || input[i] == SEP_CHAR_IN) && i - token_start < HS_BUF_SIZE - 1) {
+                    while (((input[i] >= '0' && input[i] <= '9') || (input[i] >= 'a' && input[i] <= 'f') || input[i] == hs_dec_sep_char_in || input[i] == hs_sep_char_in) && i - token_start < HS_BUF_SIZE - 1) {
                         token_lit.content[i - token_start] = input[i];
                         i++;
                     }
@@ -368,7 +372,7 @@ hs_token_list_t hs_tokenize(char *input) {
             }
             size_t token_start = i;
             token_lit.kind = HS_TOKEN_LIT_DEC;
-            while (((input[i] >= '0' && input[i] <= '9') || input[i] == '.' || input[i] == SEP_CHAR_IN) && i - token_start < HS_BUF_SIZE - 1) {
+            while (((input[i] >= '0' && input[i] <= '9') || input[i] == hs_dec_sep_char_in || input[i] == hs_sep_char_in) && i - token_start < HS_BUF_SIZE - 1) {
                 token_lit.content[i - token_start] = input[i];
                 i++;
             }
@@ -697,9 +701,9 @@ hs_value_t hs_solve(hs_token_list_t tokens, hs_state_t *state) {
                             lit_value = hs_f_add(lit_value, (hs_value_t){.re = frac_fac * (double)(tokens.items[i].content[j] - 'a' + 10), .im = 0});
                             frac_fac /= (double)base;
                         }
-                    } else if (tokens.items[i].content[j] == '.') {
+                    } else if (tokens.items[i].content[j] == hs_dec_sep_char_in) {
                         frac = true;
-                    } else if (tokens.items[i].content[j] != SEP_CHAR_IN) {
+                    } else if (tokens.items[i].content[j] != hs_sep_char_in) {
                         printf("WARNING: unexpected token \"%c\" in literal" ENDL, tokens.items[i].content[j]);
                     }
                 }
@@ -877,10 +881,10 @@ void hs_output_1dim_f(double value, hs_state_t *state, int8_t max_digits) {
         }
         value -= digit * value_of_digit;
         if (i == 0) {
-            hs_1dim_out_buf[hs_1dim_i++] = '.';
+            hs_1dim_out_buf[hs_1dim_i++] = hs_dec_sep_char_out;
             has_trailing = true;
-        } else if (i % sep_spacing == 0 && i > 0) {
-            hs_1dim_out_buf[hs_1dim_i++] = SEP_CHAR_OUT;
+        } else if (i % sep_spacing == 0 && i > 0 && hs_sep_out) {
+            hs_1dim_out_buf[hs_1dim_i++] = hs_sep_char_out;
         }
         value_of_digit /= (int)state->settings.output_mode;
     }
@@ -888,8 +892,8 @@ void hs_output_1dim_f(double value, hs_state_t *state, int8_t max_digits) {
 
     if (has_trailing) {
         for (hs_1dim_i--; hs_1dim_i > 0; hs_1dim_i--) {
-            if (hs_1dim_out_buf[hs_1dim_i] != '0' && hs_1dim_out_buf[hs_1dim_i] != SEP_CHAR_OUT) {
-                if (hs_1dim_out_buf[hs_1dim_i] == '.') {
+            if (hs_1dim_out_buf[hs_1dim_i] != '0' && hs_1dim_out_buf[hs_1dim_i] != hs_sep_char_out) {
+                if (hs_1dim_out_buf[hs_1dim_i] == hs_dec_sep_char_out) {
                     hs_1dim_i--;
                 }
                 break;
@@ -904,7 +908,7 @@ void hs_output_1dim_f(double value, hs_state_t *state, int8_t max_digits) {
     }
     bool output_empty = true;
     for (hs_1dim_i = 0; hs_1dim_i <= trailing_zeros_start; hs_1dim_i++) {
-        if ((hs_1dim_out_buf[hs_1dim_i] != '0' && hs_1dim_out_buf[hs_1dim_i] != SEP_CHAR_OUT) || leading_done) {
+        if ((hs_1dim_out_buf[hs_1dim_i] != '0' && hs_1dim_out_buf[hs_1dim_i] != hs_sep_char_out) || leading_done) {
             putchar(hs_1dim_out_buf[hs_1dim_i]);
             output_empty = false;
             leading_done = true;
@@ -915,7 +919,7 @@ void hs_output_1dim_f(double value, hs_state_t *state, int8_t max_digits) {
 }
 
 void hs_output_1dim(double value, hs_state_t *state) {
-    if ((fabs(value) < HS_SCIENT_MIN || fabs(value) >= HS_SCIENT_MAX) && fabs(value) >= HS_EPSILON && state->settings.output_mode == HS_OUTPUT_DEC) {
+    if ((fabs(value) < hs_scient_min || fabs(value) >= hs_scient_max) && fabs(value) >= HS_EPSILON && state->settings.output_mode == HS_OUTPUT_DEC) {
         // scientific output
         int16_t expo = floor(log10(value) / 3.0) * 3;
         hs_output_1dim_f(value / pow(10, expo), state, 3);
