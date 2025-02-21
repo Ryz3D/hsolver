@@ -12,6 +12,7 @@
 #define HS_BUF_SIZE 64
 #define HS_EPSILON 1e-20
 #define HS_MAX_EXP_LIST_LEN 30
+#define HS_FORCE_INTERACTIVE 1
 
 #ifdef WIN
 #define ENDL "\r\n"
@@ -299,8 +300,10 @@ bool hs_funcs_push(hs_state_t *state, hs_func_t func) {
     for (size_t i = 0; i < state->context_funcs_length; i++) {
         if (hs_str_same(func.id, state->context_funcs[i].id)) {
             func_i = i;
-            free(state->context_funcs[i].expression);
-            hs_param_free_recursive(state->context_funcs[i].params_linked);
+            if (state->context_funcs[i].expression != NULL)
+                free(state->context_funcs[i].expression);
+            if (state->context_funcs[i].params_linked != NULL)
+                hs_param_free_recursive(state->context_funcs[i].params_linked);
             break;
         }
     }
@@ -1095,20 +1098,61 @@ void hs_run(char *input, hs_state_t *state) {
             goto hs_run_error;
         if (tokens_lvalue.size == 2) {
             if (tokens_lvalue.items[0].kind == HS_TOKEN_ID) {
-                for (size_t i = 0; i < HS_BUF_SIZE && tokens_lvalue.items[0].content[i] != '\0'; i++) {
+                for (size_t i = 0; i < HS_BUF_SIZE; i++) {
                     lvalue_var.id[i] = tokens_lvalue.items[0].content[i];
+                    if (lvalue_var.id[i] == '\0')
+                        break;
                 }
             }
         } else if (tokens_lvalue.size > 2) {
             if (tokens_lvalue.items[0].kind == HS_TOKEN_ID &&
                 tokens_lvalue.items[1].kind == HS_TOKEN_OPEN_P) {
-                // TODO: check pattern [token, comma, ..., close_p, equals] (probably while creating linked list)
-                for (size_t i = 0; i < HS_BUF_SIZE && tokens_lvalue.items[0].content[i] != '\0'; i++) {
-                    lvalue_func.id[i] = tokens_lvalue.items[0].content[i];
+                lvalue_func.params_count = 0;
+                hs_func_param_t *param = NULL;
+                for (size_t t_i = 2; t_i < tokens_lvalue.size; t_i += 2) {
+                    bool is_last = false;
+                    if (tokens_lvalue.items[t_i].kind == HS_TOKEN_CLOSE_P) {
+                        break;
+                    }
+                    if (tokens_lvalue.items[t_i].kind != HS_TOKEN_ID) {
+                        printf("ERROR: invalid format for function definition" ENDL);
+                        free(tokens_lvalue.items);
+                        return;
+                    }
+                    if (tokens_lvalue.items[t_i + 1].kind == HS_TOKEN_CLOSE_P) {
+                        is_last = true;
+                    } else if (tokens_lvalue.items[t_i + 1].kind != HS_TOKEN_COMMA) {
+                        printf("ERROR: invalid format for function definition" ENDL);
+                        free(tokens_lvalue.items);
+                        return;
+                    }
+                    hs_func_param_t *next_param = malloc(sizeof(hs_func_param_t));
+                    if (param != NULL) {
+                        param->next = next_param;
+                    } else {
+                        lvalue_func.params_linked = next_param;
+                    }
+                    param = next_param;
+                    for (size_t s_i = 0; s_i < HS_BUF_SIZE; s_i++) {
+                        param->id[s_i] = tokens_lvalue.items[t_i].content[s_i];
+                        if (param->id[s_i] == '\0')
+                            break;
+                    }
+                    param->next = NULL;
+                    lvalue_func.params_count++;
+                    if (is_last)
+                        break;
                 }
-                printf("i would now set the func (%s), but i won't" ENDL, lvalue_func.id);
-                // set hs_func_t (dynamically allocated expression buffer)
-                //  -> set expression, params_linked, params_count
+                for (size_t i = 0; i < HS_BUF_SIZE; i++) {
+                    lvalue_func.id[i] = tokens_lvalue.items[0].content[i];
+                    if (lvalue_func.id[i] == '\0')
+                        break;
+                }
+                lvalue_func.expression = malloc(hs_str_len(input + lvalue_i));
+                for (size_t i = 0; i < hs_str_len(input + lvalue_i); i++) {
+                    lvalue_func.expression[i] = input[lvalue_i + 1 + i];
+                }
+                hs_funcs_push(state, lvalue_func);
             }
         }
         free(tokens_lvalue.items);
@@ -1157,9 +1201,9 @@ void hs_run(char *input, hs_state_t *state) {
                     if (state->context_funcs[j].expression != NULL) {
                         size_t exp_len = hs_str_len(state->context_funcs[j].expression);
                         if (exp_len > HS_MAX_EXP_LIST_LEN) {
-                            len += HS_MAX_EXP_LIST_LEN + 4;
+                            len += HS_MAX_EXP_LIST_LEN + 6;
                         } else {
-                            len += exp_len + 1;
+                            len += exp_len + 3;
                         }
                     }
                     
@@ -1206,17 +1250,19 @@ void hs_run(char *input, hs_state_t *state) {
                         }
                         putchar(')');
                         if (state->context_funcs[j].expression != NULL) {
+                            putchar(' ');
                             putchar('=');
+                            putchar(' ');
                             size_t exp_len = hs_str_len(state->context_funcs[j].expression);
                             if (exp_len > HS_MAX_EXP_LIST_LEN) {
                                 for (size_t k = 0; k < HS_MAX_EXP_LIST_LEN; k++) {
                                     putchar(state->context_funcs[j].expression[k]);
                                 }
                                 printf("...");
-                                len += HS_MAX_EXP_LIST_LEN + 4;
+                                len += HS_MAX_EXP_LIST_LEN + 6;
                             } else {
                                 printf("%s", state->context_funcs[j].expression);
-                                len += exp_len + 1;
+                                len += exp_len + 3;
                             }
                         }
                         for (size_t s = 0; s <= len_func - len; s++) {
@@ -1308,6 +1354,7 @@ int main(int argc, char *argv[]) {
     if (state.context_vars == NULL || state.context_funcs == NULL)
         return 1;
 
+#if !HS_FORCE_INTERACTIVE
     if (argc > 1) {
         // use quotes for command line argument
         for (int i = 1; i < argc; i++) {
@@ -1327,6 +1374,7 @@ int main(int argc, char *argv[]) {
 
         hs_run(hs_input, &state);
     } else {
+#endif
         while (true) {
             printf("> ");
             for (hs_input_i = 0; (hs_input[hs_input_i] = getchar()) != '\n'; hs_input_i++) {
@@ -1351,7 +1399,9 @@ int main(int argc, char *argv[]) {
             free(state.context_vars);
         if (state.context_funcs != NULL)
             free(state.context_funcs);
+#if !HS_FORCE_INTERACTIVE
     }
+#endif
 
     free(hs_input);
 
