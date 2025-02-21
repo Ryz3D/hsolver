@@ -5,21 +5,13 @@
 #include <math.h>
 
 // TODO:
-//  - custom variables and custom functions to context (funcs must start with letter)
 //  - console colors/bold (especially "list")
 //  - commands for scient_min/_max & sep_char_in/_out & sep_on/_off (could be set like hs_var_t)
 
 #define HS_MAX_FRAC_DIGITS 13
 #define HS_BUF_SIZE 64
 #define HS_EPSILON 1e-20
-
-const double hs_scient_min = 0.01;
-const double hs_scient_max = 10000;
-const char hs_dec_sep_char_in = '.';
-const char hs_dec_sep_char_out = '.';
-const bool hs_sep_out = true;
-const char hs_sep_char_in = '\'';
-const char hs_sep_char_out = '\'';
+#define HS_MAX_EXP_LIST_LEN 30
 
 #ifdef WIN
 #define ENDL "\r\n"
@@ -41,6 +33,15 @@ const char hs_sep_char_out = '\'';
 #define HS_ZERO ((hs_value_t){.re = 0, .im = 0})
 #define HS_ONE ((hs_value_t){.re = 1, .im = 0})
 
+const char *help_text = \
+"commands:" ENDL \
+"- list" ENDL \
+"- bin [inline expression]" ENDL \
+"- oct [inline expression]" ENDL \
+"- dec [inline expression]" ENDL \
+"- hex [inline expression]" ENDL \
+; // TODO: add settings when working
+
 typedef struct hs_value {
     double re;
     double im;
@@ -52,20 +53,20 @@ typedef struct hs_var {
 } hs_var_t;
 
 hs_var_t hs_default_vars[] = {
-    {.id = "zero", .value = {.re = 0, .im = 0}},
-    {.id = "one", .value = {.re = 1, .im = 0}},
-    {.id = "inch", .value = {.re = 0.0254, .im = 0}},
-    {.id = "foot", .value = {.re = 0.3048, .im = 0}},
-    {.id = "mile", .value = {.re = 1609.34, .im = 0}},
-    {.id = "i", .value = {.re = 0, .im = 1}},
-    {.id = "e", .value = {.re = 2.718281828459045235360287471352662497757247093, .im = 0}},
-    {.id = "pi", .value = {.re = 3.141592653589793238462643383279502884197169399, .im = 0}},
-    {.id = "tau", .value = {.re = 6.283185307179586476925286766559005768394338798, .im = 0}},
-    {.id = "phi", .value = {.re = 1.618033988749894848204586834365638117720309179, .im = 0}},
-    {.id = "c", .value = {.re = 299792458, .im = 0}},
-    {.id = "g", .value = {.re = 9.80665, .im = 0}},
-    {.id = "ev", .value = {.re = 1.602176634e-19, .im = 0}},
-    {.id = "mu_0", .value = {.re = 1.25663706127e-6, .im = 0}},
+    {.id = "zero",   .value = {.re = 0,                .im = 0}},
+    {.id = "one",    .value = {.re = 1,                .im = 0}},
+    {.id = "inch",   .value = {.re = 0.0254,           .im = 0}},
+    {.id = "foot",   .value = {.re = 0.3048,           .im = 0}},
+    {.id = "mile",   .value = {.re = 1609.34,          .im = 0}},
+    {.id = "i",      .value = {.re = 0,                .im = 1}},
+    {.id = "e",      .value = {.re = 2.718281828459045235360287471352662497757247093, .im = 0}},
+    {.id = "pi",     .value = {.re = 3.141592653589793238462643383279502884197169399, .im = 0}},
+    {.id = "tau",    .value = {.re = 6.283185307179586476925286766559005768394338798, .im = 0}},
+    {.id = "phi",    .value = {.re = 1.618033988749894848204586834365638117720309179, .im = 0}},
+    {.id = "c",      .value = {.re = 299792458,        .im = 0}},
+    {.id = "g",      .value = {.re = 9.80665,          .im = 0}},
+    {.id = "ev",     .value = {.re = 1.602176634e-19,  .im = 0}},
+    {.id = "mu_0",   .value = {.re = 1.25663706127e-6, .im = 0}},
     {.id = "epsi_0", .value = {.re = 8.8541878188e-12, .im = 0}},
 };
 
@@ -115,7 +116,7 @@ hs_value_t hs_f_modulo(hs_value_t a, hs_value_t b) {
 
 hs_value_t hs_f_pow(hs_value_t a, hs_value_t b) {
     if (fabs(a.im) >= HS_EPSILON || fabs(b.im) >= HS_EPSILON) {
-        printf("ERROR: i'm sorry dave, i can't let you do that with complex numbers" ENDL);
+        printf("ERROR: i'm sorry dave, i can't let you do that (-> exponent) with complex numbers" ENDL);
         return (hs_value_t){.re = NAN, .im = NAN};
     }
     return (hs_value_t){.re = pow(a.re, b.re), .im = 0};
@@ -123,7 +124,7 @@ hs_value_t hs_f_pow(hs_value_t a, hs_value_t b) {
 
 hs_value_t hs_f_root(hs_value_t a, hs_value_t b) {
     if (fabs(a.im) >= HS_EPSILON || fabs(b.im) >= HS_EPSILON) {
-        printf("ERROR: i'm sorry dave, i can't let you do that with complex numbers" ENDL);
+        printf("ERROR: i'm sorry dave, i can't let you do that (-> root) with complex numbers" ENDL);
         return (hs_value_t){.re = NAN, .im = NAN};
     }
     return hs_f_pow(a, hs_f_divide(HS_ONE, b));
@@ -144,7 +145,7 @@ hs_value_t hs_f_ln(hs_value_t a, hs_value_t b) {
 
 hs_value_t hs_f_log2(hs_value_t a, hs_value_t b) {
     if (fabs(a.im) >= HS_EPSILON) {
-        printf("ERROR: i'm sorry dave, i can't let you do that with complex numbers" ENDL);
+        printf("ERROR: i'm sorry dave, i can't let you do that (-> log2) with complex numbers" ENDL);
         return (hs_value_t){.re = NAN, .im = NAN};
     }
     return (hs_value_t){.re = log2(a.re), .im = 0};
@@ -152,34 +153,43 @@ hs_value_t hs_f_log2(hs_value_t a, hs_value_t b) {
 
 hs_value_t hs_f_log10(hs_value_t a, hs_value_t b) {
     if (fabs(a.im) >= HS_EPSILON) {
-        printf("ERROR: i'm sorry dave, i can't let you do that with complex numbers" ENDL);
+        printf("ERROR: i'm sorry dave, i can't let you do that (-> log10) with complex numbers" ENDL);
         return (hs_value_t){.re = NAN, .im = NAN};
     }
     return (hs_value_t){.re = log10(a.re), .im = 0};
 }
 
+typedef struct hs_func_param hs_func_param_t;
+
 typedef struct hs_func {
     char id[HS_BUF_SIZE];
     hs_value_t (*func)(hs_value_t a, hs_value_t b);
-    uint8_t params;
+    uint8_t params_count;
+    hs_func_param_t *params_linked;
+    char *expression;
 } hs_func_t;
 
+typedef struct hs_func_param {
+    char id[HS_BUF_SIZE];
+    hs_func_param_t *next;
+} hs_func_param_t;
+
 hs_func_t hs_default_funcs[] = {
-    {.id = "add",       .func = hs_f_add,       .params = 2},
-    {.id = "subtract",  .func = hs_f_subtract,  .params = 2},
-    {.id = "multiply",  .func = hs_f_multiply,  .params = 2},
-    {.id = "divide",    .func = hs_f_divide,    .params = 2},
-    {.id = "modulo",    .func = hs_f_modulo,    .params = 2},
-    {.id = "pow",       .func = hs_f_pow,       .params = 2},
-    {.id = "root",      .func = hs_f_root,      .params = 2},
-    {.id = "sqrt",      .func = hs_f_sqrt,      .params = 1},
-    {.id = "round",     .func = hs_f_round,     .params = 1},
-    {.id = "floor",     .func = hs_f_floor,     .params = 1},
-    {.id = "ceil",      .func = hs_f_ceil,      .params = 1},
-    {.id = "abs",       .func = hs_f_abs,       .params = 1},
-    {.id = "ln",        .func = hs_f_ln,        .params = 1},
-    {.id = "log2",      .func = hs_f_log2,      .params = 1},
-    {.id = "log10",     .func = hs_f_log10,     .params = 1},
+    {.id = "add",       .func = hs_f_add,       .params_count = 2},
+    {.id = "subtract",  .func = hs_f_subtract,  .params_count = 2},
+    {.id = "multiply",  .func = hs_f_multiply,  .params_count = 2},
+    {.id = "divide",    .func = hs_f_divide,    .params_count = 2},
+    {.id = "modulo",    .func = hs_f_modulo,    .params_count = 2},
+    {.id = "pow",       .func = hs_f_pow,       .params_count = 2},
+    {.id = "root",      .func = hs_f_root,      .params_count = 2},
+    {.id = "sqrt",      .func = hs_f_sqrt,      .params_count = 1},
+    {.id = "round",     .func = hs_f_round,     .params_count = 1},
+    {.id = "floor",     .func = hs_f_floor,     .params_count = 1},
+    {.id = "ceil",      .func = hs_f_ceil,      .params_count = 1},
+    {.id = "abs",       .func = hs_f_abs,       .params_count = 1},
+    {.id = "ln",        .func = hs_f_ln,        .params_count = 1},
+    {.id = "log2",      .func = hs_f_log2,      .params_count = 1},
+    {.id = "log10",     .func = hs_f_log10,     .params_count = 1},
 };
 
 typedef enum hs_output_mode {
@@ -191,6 +201,13 @@ typedef enum hs_output_mode {
 
 typedef struct hs_settings {
     hs_output_mode_t output_mode;
+    double scient_min;
+    double scient_max;
+    char dec_sep_char_in;
+    char dec_sep_char_out;
+    bool sep_out;
+    char sep_char_in;
+    char sep_char_out;
 } hs_settings_t;
 
 typedef struct hs_state {
@@ -201,6 +218,8 @@ typedef struct hs_state {
     hs_settings_t settings;
 } hs_state_t;
 
+bool hs_funcs_push(hs_state_t *state, hs_func_t func);
+
 hs_state_t hs_default_state() {
     hs_state_t state = {
         .context_vars = malloc(sizeof(hs_default_vars) + 1 * sizeof(hs_var_t)),
@@ -209,20 +228,93 @@ hs_state_t hs_default_state() {
         .context_funcs_length = sizeof(hs_default_funcs) / sizeof(hs_func_t),
         .settings = {
             .output_mode = HS_OUTPUT_DEC,
+            .scient_min = 0.01,
+            .scient_max = 10000,
+            .dec_sep_char_in = '.',
+            .dec_sep_char_out = '.',
+            .sep_out = true,
+            .sep_char_in = '\'',
+            .sep_char_out = '\'',
         },
     };
-    state.context_vars[0].id[0] = 'a';
-    state.context_vars[0].id[1] = 'n';
-    state.context_vars[0].id[2] = 's';
-    state.context_vars[0].id[3] = '\0';
-    state.context_vars[0].value = HS_ZERO;
+    if (state.context_vars == NULL) {
+        printf("ERROR: out of memory during variable list initialization :(" ENDL);
+        return state;
+    }
+    if (state.context_funcs == NULL ) {
+        printf("ERROR: out of memory during function list initialization :(" ENDL);
+        return state;
+    }
+    state.context_vars[0] = (hs_var_t){
+        .id = "ans",
+        .value = HS_ZERO,
+    };
     for (size_t i = 0; i < sizeof(hs_default_vars) / sizeof(hs_var_t); i++) {
         state.context_vars[i + 1] = hs_default_vars[i];
     }
     for (size_t i = 0; i < state.context_funcs_length; i++) {
         state.context_funcs[i] = hs_default_funcs[i];
+        state.context_funcs[i].params_linked = NULL;
+        state.context_funcs[i].expression = NULL;
     }
+
     return state;
+}
+
+bool hs_str_same(char*, char*);
+
+bool hs_vars_push(hs_state_t *state, hs_var_t var) {
+    size_t var_i = -1;
+    for (size_t i = 0; i < state->context_vars_length; i++) {
+        if (hs_str_same(var.id, state->context_vars[i].id)) {
+            var_i = i;
+            break;
+        }
+    }
+    if (var_i == -1) {
+        state->context_vars_length++;
+        state->context_vars = realloc(state->context_vars, state->context_vars_length * sizeof(hs_var_t));
+        if (state->context_vars == NULL) {
+            printf("ERROR: out of memory during variable list reallocation at " SIZE_T_F " tokens :(" ENDL, state->context_vars_length);
+            return false;
+        }
+        var_i = state->context_vars_length - 1;
+    }
+    state->context_vars[var_i] = var;
+    return true;
+}
+
+void hs_param_free_recursive(hs_func_param_t *param) {
+    if (param->next != NULL) {
+        hs_param_free_recursive(param->next);
+        param->next = NULL;
+    }
+    if (param != NULL) {
+        free(param);
+    }
+}
+
+bool hs_funcs_push(hs_state_t *state, hs_func_t func) {
+    size_t func_i = -1;
+    for (size_t i = 0; i < state->context_funcs_length; i++) {
+        if (hs_str_same(func.id, state->context_funcs[i].id)) {
+            func_i = i;
+            free(state->context_funcs[i].expression);
+            hs_param_free_recursive(state->context_funcs[i].params_linked);
+            break;
+        }
+    }
+    if (func_i == -1) {
+        state->context_funcs_length++;
+        state->context_funcs = realloc(state->context_funcs, state->context_funcs_length * sizeof(hs_func_t));
+        if (state->context_funcs == NULL) {
+            printf("ERROR: out of memory during function list reallocation at " SIZE_T_F " tokens :(" ENDL, state->context_funcs_length);
+            return false;
+        }
+        func_i = state->context_funcs_length - 1;
+    }
+    state->context_funcs[func_i] = func;
+    return true;
 }
 
 void hs_preprocess_input(char *input) {
@@ -301,7 +393,7 @@ hs_token_t hs_token_list_pop(hs_token_list_t *list) {
     }
 }
 
-hs_token_list_t hs_tokenize(char *input) {
+hs_token_list_t hs_tokenize(char *input, hs_state_t *state) {
     hs_token_list_t tokens = hs_token_list_init();
 
     if (tokens.items == NULL)
@@ -326,14 +418,14 @@ hs_token_list_t hs_tokenize(char *input) {
             if (!hs_token_list_push(&tokens, (hs_token_t){.kind = HS_TOKEN_CLOSE_P})) goto hs_tokenize_error;
         } else if (input[i] == ',') {
             if (!hs_token_list_push(&tokens, (hs_token_t){.kind = HS_TOKEN_COMMA})) goto hs_tokenize_error;
-        } else if ((input[i] >= '0' && input[i] <= '9') || input[i] == hs_dec_sep_char_in) {
+        } else if ((input[i] >= '0' && input[i] <= '9') || input[i] == state->settings.dec_sep_char_in) {
             hs_token_t token_lit;
             if (input[i] == '0') {
                 if (input[i + 1] == 'b') {
                     i += 2;
                     size_t token_start = i;
                     token_lit.kind = HS_TOKEN_LIT_BIN;
-                    while (((input[i] >= '0' && input[i] <= '1') || input[i] == hs_dec_sep_char_in || input[i] == hs_sep_char_in) && i - token_start < HS_BUF_SIZE - 1) {
+                    while (((input[i] >= '0' && input[i] <= '1') || input[i] == state->settings.dec_sep_char_in || input[i] == state->settings.sep_char_in) && i - token_start < HS_BUF_SIZE - 1) {
                         token_lit.content[i - token_start] = input[i];
                         i++;
                     }
@@ -346,7 +438,7 @@ hs_token_list_t hs_tokenize(char *input) {
                     i += 2;
                     size_t token_start = i;
                     token_lit.kind = HS_TOKEN_LIT_OCT;
-                    while (((input[i] >= '0' && input[i] <= '7') || input[i] == hs_dec_sep_char_in || input[i] == hs_sep_char_in) && i - token_start < HS_BUF_SIZE - 1) {
+                    while (((input[i] >= '0' && input[i] <= '7') || input[i] == state->settings.dec_sep_char_in || input[i] == state->settings.sep_char_in) && i - token_start < HS_BUF_SIZE - 1) {
                         token_lit.content[i - token_start] = input[i];
                         i++;
                     }
@@ -359,7 +451,7 @@ hs_token_list_t hs_tokenize(char *input) {
                     i += 2;
                     size_t token_start = i;
                     token_lit.kind = HS_TOKEN_LIT_HEX;
-                    while (((input[i] >= '0' && input[i] <= '9') || (input[i] >= 'a' && input[i] <= 'f') || input[i] == hs_dec_sep_char_in || input[i] == hs_sep_char_in) && i - token_start < HS_BUF_SIZE - 1) {
+                    while (((input[i] >= '0' && input[i] <= '9') || (input[i] >= 'a' && input[i] <= 'f') || input[i] == state->settings.dec_sep_char_in || input[i] == state->settings.sep_char_in) && i - token_start < HS_BUF_SIZE - 1) {
                         token_lit.content[i - token_start] = input[i];
                         i++;
                     }
@@ -372,7 +464,7 @@ hs_token_list_t hs_tokenize(char *input) {
             }
             size_t token_start = i;
             token_lit.kind = HS_TOKEN_LIT_DEC;
-            while (((input[i] >= '0' && input[i] <= '9') || input[i] == hs_dec_sep_char_in || input[i] == hs_sep_char_in) && i - token_start < HS_BUF_SIZE - 1) {
+            while (((input[i] >= '0' && input[i] <= '9') || input[i] == state->settings.dec_sep_char_in || input[i] == state->settings.sep_char_in) && i - token_start < HS_BUF_SIZE - 1) {
                 token_lit.content[i - token_start] = input[i];
                 i++;
             }
@@ -701,9 +793,9 @@ hs_value_t hs_solve(hs_token_list_t tokens, hs_state_t *state) {
                             lit_value = hs_f_add(lit_value, (hs_value_t){.re = frac_fac * (double)(tokens.items[i].content[j] - 'a' + 10), .im = 0});
                             frac_fac /= (double)base;
                         }
-                    } else if (tokens.items[i].content[j] == hs_dec_sep_char_in) {
+                    } else if (tokens.items[i].content[j] == state->settings.dec_sep_char_in) {
                         frac = true;
-                    } else if (tokens.items[i].content[j] != hs_sep_char_in) {
+                    } else if (tokens.items[i].content[j] != state->settings.sep_char_in) {
                         printf("WARNING: unexpected token \"%c\" in literal" ENDL, tokens.items[i].content[j]);
                     }
                 }
@@ -734,13 +826,21 @@ hs_value_t hs_solve(hs_token_list_t tokens, hs_state_t *state) {
                 for (size_t j = 0; j < state->context_funcs_length; j++) {
                     if (hs_str_same(tokens.items[i].content, state->context_funcs[j].id)) {
                         hs_value_t return_value;
-                        if (state->context_funcs[j].params == 1) {
-                            a = hs_value_list_pop(&list);
-                            return_value = state->context_funcs[j].func(a, HS_ZERO);
+                        if (state->context_funcs[j].func == NULL) {
+                            // TODO: traverse linked list params_linked
+                            // assign each (in revese) by popping list to temporary state
+                            //   -> (allocate SEPARATE context_vars with size + params_count)
+                            // evaluate func->expression in temporary state, clean up
+                            printf("i would call the function (%s) now, but i won't" ENDL, state->context_funcs[j].id);
                         } else {
-                            b = hs_value_list_pop(&list);
-                            a = hs_value_list_pop(&list);
-                            return_value = state->context_funcs[j].func(a, b);
+                            if (state->context_funcs[j].params_count == 1) {
+                                a = hs_value_list_pop(&list);
+                                return_value = state->context_funcs[j].func(a, HS_ZERO);
+                            } else {
+                                b = hs_value_list_pop(&list);
+                                a = hs_value_list_pop(&list);
+                                return_value = state->context_funcs[j].func(a, b);
+                            }
                         }
                         if (!hs_value_list_push(&list, return_value))
                             goto hs_solve_error;
@@ -881,10 +981,10 @@ void hs_output_1dim_f(double value, hs_state_t *state, int8_t max_digits) {
         }
         value -= digit * value_of_digit;
         if (i == 0) {
-            hs_1dim_out_buf[hs_1dim_i++] = hs_dec_sep_char_out;
+            hs_1dim_out_buf[hs_1dim_i++] = state->settings.dec_sep_char_out;
             has_trailing = true;
-        } else if (i % sep_spacing == 0 && i > 0 && hs_sep_out) {
-            hs_1dim_out_buf[hs_1dim_i++] = hs_sep_char_out;
+        } else if (i % sep_spacing == 0 && i > 0 && state->settings.sep_out) {
+            hs_1dim_out_buf[hs_1dim_i++] = state->settings.sep_char_out;
         }
         value_of_digit /= (int)state->settings.output_mode;
     }
@@ -892,8 +992,8 @@ void hs_output_1dim_f(double value, hs_state_t *state, int8_t max_digits) {
 
     if (has_trailing) {
         for (hs_1dim_i--; hs_1dim_i > 0; hs_1dim_i--) {
-            if (hs_1dim_out_buf[hs_1dim_i] != '0' && hs_1dim_out_buf[hs_1dim_i] != hs_sep_char_out) {
-                if (hs_1dim_out_buf[hs_1dim_i] == hs_dec_sep_char_out) {
+            if (hs_1dim_out_buf[hs_1dim_i] != '0' && hs_1dim_out_buf[hs_1dim_i] != state->settings.sep_char_out) {
+                if (hs_1dim_out_buf[hs_1dim_i] == state->settings.dec_sep_char_out) {
                     hs_1dim_i--;
                 }
                 break;
@@ -908,7 +1008,7 @@ void hs_output_1dim_f(double value, hs_state_t *state, int8_t max_digits) {
     }
     bool output_empty = true;
     for (hs_1dim_i = 0; hs_1dim_i <= trailing_zeros_start; hs_1dim_i++) {
-        if ((hs_1dim_out_buf[hs_1dim_i] != '0' && hs_1dim_out_buf[hs_1dim_i] != hs_sep_char_out) || leading_done) {
+        if ((hs_1dim_out_buf[hs_1dim_i] != '0' && hs_1dim_out_buf[hs_1dim_i] != state->settings.sep_char_out) || leading_done) {
             putchar(hs_1dim_out_buf[hs_1dim_i]);
             output_empty = false;
             leading_done = true;
@@ -919,7 +1019,7 @@ void hs_output_1dim_f(double value, hs_state_t *state, int8_t max_digits) {
 }
 
 void hs_output_1dim(double value, hs_state_t *state) {
-    if ((fabs(value) < hs_scient_min || fabs(value) >= hs_scient_max) && fabs(value) >= HS_EPSILON && state->settings.output_mode == HS_OUTPUT_DEC) {
+    if ((fabs(value) < state->settings.scient_min || fabs(value) >= state->settings.scient_max) && fabs(value) >= HS_EPSILON && state->settings.output_mode == HS_OUTPUT_DEC) {
         // scientific output
         int16_t expo = floor(log10(value) / 3.0) * 3;
         hs_output_1dim_f(value / pow(10, expo), state, 3);
@@ -956,17 +1056,68 @@ void hs_output(hs_value_t value, hs_state_t *state) {
     }
 }
 
-hs_state_t temp_state;
 hs_settings_t temp_settings;
 
 void hs_run(char *input, hs_state_t *state) {
     if (state == NULL) {
-        temp_state = hs_default_state();
-        state = &temp_state;
+        return;
     }
 
     hs_preprocess_input(input);
-    hs_token_list_t tokens1 = hs_tokenize(input);
+
+    size_t lvalue_i = 0;
+    char lvalue_buffer[HS_BUF_SIZE];
+    for (; lvalue_i < sizeof(lvalue_buffer); lvalue_i++) {
+        if (input[lvalue_i] == '\0') {
+            lvalue_i = 0;
+            break;
+        } else if (input[lvalue_i] == '=') {
+            lvalue_buffer[lvalue_i] = '\0';
+            break;
+        } else {
+            lvalue_buffer[lvalue_i] = input[lvalue_i];
+        }
+    }
+    hs_var_t lvalue_var = {
+        .id = "",
+        .value = HS_ZERO,
+    };
+    hs_func_t lvalue_func = {
+        .id = "",
+        .func = NULL,
+        .params_count = 0,
+        .params_linked = NULL,
+        .expression = "",
+    };
+    if (lvalue_i > 0) {
+        hs_token_list_t tokens_lvalue = hs_tokenize(lvalue_buffer, state);
+        if (tokens_lvalue.items == NULL)
+            goto hs_run_error;
+        if (tokens_lvalue.size == 2) {
+            if (tokens_lvalue.items[0].kind == HS_TOKEN_ID) {
+                for (size_t i = 0; i < HS_BUF_SIZE && tokens_lvalue.items[0].content[i] != '\0'; i++) {
+                    lvalue_var.id[i] = tokens_lvalue.items[0].content[i];
+                }
+            }
+        } else if (tokens_lvalue.size > 2) {
+            if (tokens_lvalue.items[0].kind == HS_TOKEN_ID &&
+                tokens_lvalue.items[1].kind == HS_TOKEN_OPEN_P) {
+                // TODO: check pattern [token, comma, ..., close_p, equals] (probably while creating linked list)
+                for (size_t i = 0; i < HS_BUF_SIZE && tokens_lvalue.items[0].content[i] != '\0'; i++) {
+                    lvalue_func.id[i] = tokens_lvalue.items[0].content[i];
+                }
+                printf("i would now set the func (%s), but i won't" ENDL, lvalue_func.id);
+                // set hs_func_t (dynamically allocated expression buffer)
+                //  -> set expression, params_linked, params_count
+            }
+        }
+        free(tokens_lvalue.items);
+        if (lvalue_func.id[0] != '\0') {
+            return;
+        }
+    }
+
+    hs_token_list_t tokens1 = hs_tokenize(input + lvalue_i, state);
     if (tokens1.items == NULL)
         goto hs_run_error;
 
@@ -980,12 +1131,38 @@ void hs_run(char *input, hs_state_t *state) {
         goto hs_run_error;
     for (size_t i = 0; i < tokens1.size; i++) {
         if (tokens1.items[i].kind == HS_TOKEN_ID) {
-            if (hs_str_same(tokens1.items[i].content, "list")) {
+            if (hs_str_same(tokens1.items[i].content, "help")) {
+                printf(help_text);
+                continue;
+            } else if (hs_str_same(tokens1.items[i].content, "list")) {
                 size_t len_func = 0;
                 size_t len_var = 0;
                 
                 for (size_t j = 0; j < state->context_funcs_length; j++) {
-                    size_t len = hs_str_len(state->context_funcs[j].id) + 3 + state->context_funcs[j].params * 3;
+                    size_t len = 3;
+                    len += hs_str_len(state->context_funcs[j].id);
+
+                    hs_func_param_t *param = state->context_funcs[j].params_linked;
+                    for (uint8_t p = 0; p < state->context_funcs[j].params_count; p++) {
+                        if (param == NULL) {
+                            len++;
+                        } else {
+                            len += hs_str_len(param->id);
+                            param = param->next;
+                        }
+                        if (p < state->context_funcs[j].params_count - 1) {
+                            len += 2;
+                        }
+                    }
+                    if (state->context_funcs[j].expression != NULL) {
+                        size_t exp_len = hs_str_len(state->context_funcs[j].expression);
+                        if (exp_len > HS_MAX_EXP_LIST_LEN) {
+                            len += HS_MAX_EXP_LIST_LEN + 4;
+                        } else {
+                            len += exp_len + 1;
+                        }
+                    }
+                    
                     len_func = len > len_func ? len : len_func;
                 }
                 for (size_t j = 0; j < state->context_vars_length; j++) {
@@ -999,7 +1176,7 @@ void hs_run(char *input, hs_state_t *state) {
                 for (size_t s = 0; s <= len_func - (hs_str_len((char *)funcs) + 2); s++) {
                     putchar('-');
                 }
-                printf("|--%s", vars);
+                printf("-|--%s", vars);
                 for (size_t s = 0; s <= len_var + 2 + HS_MAX_FRAC_DIGITS - hs_str_len((char *)vars); s++) {
                     putchar('-');
                 }
@@ -1007,20 +1184,46 @@ void hs_run(char *input, hs_state_t *state) {
 
                 for (size_t j = 0; j < state->context_vars_length || j < state->context_funcs_length; j++) {
                     if (j < state->context_funcs_length) {
+                        size_t len = 3;
                         printf("  %s(", state->context_funcs[j].id);
-                        for (uint8_t p = 0; p < state->context_funcs[j].params; p++) {
-                            putchar('a' + p);
-                            if (p < state->context_funcs[j].params - 1) {
+                        len += hs_str_len(state->context_funcs[j].id);
+    
+                        hs_func_param_t *param = state->context_funcs[j].params_linked;
+                        for (uint8_t p = 0; p < state->context_funcs[j].params_count; p++) {
+                            if (param == NULL) {
+                                putchar('a' + p);
+                                len++;
+                            } else {
+                                printf("%s", param->id);
+                                len += hs_str_len(param->id);
+                                param = param->next;
+                            }
+                            if (p < state->context_funcs[j].params_count - 1) {
                                 putchar(',');
                                 putchar(' ');
+                                len += 2;
                             }
                         }
                         putchar(')');
-                        for (size_t s = 0; s <= len_func - (hs_str_len(state->context_funcs[j].id) + 2 + state->context_funcs[j].params * 3); s++) {
+                        if (state->context_funcs[j].expression != NULL) {
+                            putchar('=');
+                            size_t exp_len = hs_str_len(state->context_funcs[j].expression);
+                            if (exp_len > HS_MAX_EXP_LIST_LEN) {
+                                for (size_t k = 0; k < HS_MAX_EXP_LIST_LEN; k++) {
+                                    putchar(state->context_funcs[j].expression[k]);
+                                }
+                                printf("...");
+                                len += HS_MAX_EXP_LIST_LEN + 4;
+                            } else {
+                                printf("%s", state->context_funcs[j].expression);
+                                len += exp_len + 1;
+                            }
+                        }
+                        for (size_t s = 0; s <= len_func - len; s++) {
                             putchar(' ');
                         }
                     } else {
-                        for (size_t s = 0; s <= len_func; s++) {
+                        for (size_t s = 0; s <= len_func + 1; s++) {
                             putchar(' ');
                         }
                     }
@@ -1074,6 +1277,10 @@ void hs_run(char *input, hs_state_t *state) {
         free(tokens3.items);
         hs_output(result, state);
         printf(ENDL);
+        if (lvalue_var.id[0] != '\0') {
+            lvalue_var.value = result;
+            hs_vars_push(state, lvalue_var);
+        }
     }
     if (restore_settings)
         state->settings = temp_settings;
@@ -1097,8 +1304,9 @@ int main(int argc, char *argv[]) {
     hs_input[0] = '\0';
     size_t hs_input_i = 0;
 
-    temp_state.context_vars = NULL;
-    temp_state.context_funcs = NULL;
+    hs_state_t state = hs_default_state();
+    if (state.context_vars == NULL || state.context_funcs == NULL)
+        return 1;
 
     if (argc > 1) {
         // use quotes for command line argument
@@ -1117,10 +1325,8 @@ int main(int argc, char *argv[]) {
         }
         hs_input[hs_input_i] = '\0';
 
-        hs_run(hs_input, NULL);
+        hs_run(hs_input, &state);
     } else {
-        hs_state_t state = hs_default_state();
-
         while (true) {
             printf("> ");
             for (hs_input_i = 0; (hs_input[hs_input_i] = getchar()) != '\n'; hs_input_i++) {
@@ -1141,15 +1347,10 @@ int main(int argc, char *argv[]) {
             hs_run(hs_input, &state);
         }
 
-        free(state.context_vars);
-        free(state.context_funcs);
-    }
-
-    if (temp_state.context_vars != NULL) {
-        free(temp_state.context_vars);
-    }
-    if (temp_state.context_funcs != NULL) {
-        free(temp_state.context_funcs);
+        if (state.context_vars != NULL)
+            free(state.context_vars);
+        if (state.context_funcs != NULL)
+            free(state.context_funcs);
     }
 
     free(hs_input);
