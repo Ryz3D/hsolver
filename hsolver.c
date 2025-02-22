@@ -5,6 +5,7 @@
 #include <math.h>
 
 // TODO:
+//  - fix "bin x=1"
 //  - commands for char settings (sep_char_in/_out, dec_sep_char_in/_out)
 //  - console colors/bold (especially "list")
 
@@ -231,6 +232,26 @@ hs_value_t hs_f_atan2(hs_value_t a, hs_value_t b) {
     return (hs_value_t){.re = atan2(a.re, b.re), .im = 0};
 }
 
+hs_value_t hs_f_and(hs_value_t a, hs_value_t b) {
+    return (hs_value_t){.re = (uint64_t)a.re & (uint64_t)b.re, .im = (uint64_t)a.im & (uint64_t)b.im};
+}
+
+hs_value_t hs_f_or(hs_value_t a, hs_value_t b) {
+    return (hs_value_t){.re = (uint64_t)a.re | (uint64_t)b.re, .im = (uint64_t)a.im | (uint64_t)b.im};
+}
+
+hs_value_t hs_f_xor(hs_value_t a, hs_value_t b) {
+    return (hs_value_t){.re = (uint64_t)a.re ^ (uint64_t)b.re, .im = (uint64_t)a.im ^ (uint64_t)b.im};
+}
+
+hs_value_t hs_f_shiftl(hs_value_t a, hs_value_t b) {
+    return (hs_value_t){.re = (uint64_t)a.re << (uint64_t)b.re, .im = (uint64_t)a.im << (uint64_t)b.im};
+}
+
+hs_value_t hs_f_shiftr(hs_value_t a, hs_value_t b) {
+    return (hs_value_t){.re = (uint64_t)a.re >> (uint64_t)b.re, .im = (uint64_t)a.im >> (uint64_t)b.im};
+}
+
 typedef struct hs_func_param hs_func_param_t;
 
 typedef struct hs_func {
@@ -272,6 +293,11 @@ hs_func_t hs_default_funcs[] = {
     {.id = "tanh",      .func = hs_f_tanh,      .params_count = 1},
     {.id = "atan",      .func = hs_f_atan,      .params_count = 1},
     {.id = "atan2",     .func = hs_f_atan2,     .params_count = 1},
+    {.id = "and",       .func = hs_f_and,       .params_count = 2},
+    {.id = "or",        .func = hs_f_or,        .params_count = 2},
+    {.id = "xor",       .func = hs_f_xor,       .params_count = 2},
+    {.id = "shiftl",    .func = hs_f_shiftl,    .params_count = 2},
+    {.id = "shiftr",    .func = hs_f_shiftr,    .params_count = 2},
 };
 
 typedef enum hs_output_mode {
@@ -424,6 +450,11 @@ typedef enum hs_token_kind {
     HS_TOKEN_DIVIDE,
     HS_TOKEN_MODULO,
     HS_TOKEN_POWER,
+    HS_TOKEN_AND,
+    HS_TOKEN_OR,
+    HS_TOKEN_XOR,
+    HS_TOKEN_SHIFTL,
+    HS_TOKEN_SHIFTR,
     HS_TOKEN_OPEN_P,
     HS_TOKEN_CLOSE_P,
     HS_TOKEN_COMMA,
@@ -496,6 +527,16 @@ hs_token_list_t hs_tokenize(char *input, hs_state_t *state) {
             if (!hs_token_list_push(&tokens, (hs_token_t){.kind = HS_TOKEN_MODULO})) goto hs_tokenize_error;
         } else if (input[i] == '^') {
             if (!hs_token_list_push(&tokens, (hs_token_t){.kind = HS_TOKEN_POWER})) goto hs_tokenize_error;
+        } else if (input[i] == '&') {
+            if (!hs_token_list_push(&tokens, (hs_token_t){.kind = HS_TOKEN_AND})) goto hs_tokenize_error;
+        } else if (input[i] == '|') {
+            if (!hs_token_list_push(&tokens, (hs_token_t){.kind = HS_TOKEN_OR})) goto hs_tokenize_error;
+        } else if (input[i] == '~') {
+            if (!hs_token_list_push(&tokens, (hs_token_t){.kind = HS_TOKEN_XOR})) goto hs_tokenize_error;
+        } else if (input[i] == '<') {
+            if (!hs_token_list_push(&tokens, (hs_token_t){.kind = HS_TOKEN_SHIFTL})) goto hs_tokenize_error;
+        } else if (input[i] == '>') {
+            if (!hs_token_list_push(&tokens, (hs_token_t){.kind = HS_TOKEN_SHIFTR})) goto hs_tokenize_error;
         } else if (input[i] == '(') {
             if (!hs_token_list_push(&tokens, (hs_token_t){.kind = HS_TOKEN_OPEN_P})) goto hs_tokenize_error;
         } else if (input[i] == ')') {
@@ -562,7 +603,12 @@ hs_token_list_t hs_tokenize(char *input, hs_state_t *state) {
                                      tokens.items[tokens.size - 2].kind == HS_TOKEN_MULTIPLY ||
                                      tokens.items[tokens.size - 2].kind == HS_TOKEN_DIVIDE ||
                                      tokens.items[tokens.size - 2].kind == HS_TOKEN_MODULO ||
-                                     tokens.items[tokens.size - 2].kind == HS_TOKEN_POWER)) || tokens.size == 1)) {
+                                     tokens.items[tokens.size - 2].kind == HS_TOKEN_POWER ||
+                                     tokens.items[tokens.size - 2].kind == HS_TOKEN_AND ||
+                                     tokens.items[tokens.size - 2].kind == HS_TOKEN_OR ||
+                                     tokens.items[tokens.size - 2].kind == HS_TOKEN_XOR ||
+                                     tokens.items[tokens.size - 2].kind == HS_TOKEN_SHIFTL ||
+                                     tokens.items[tokens.size - 2].kind == HS_TOKEN_SHIFTR)) || tokens.size == 1)) {
                 hs_token_list_pop(&tokens);
                 char last_char = '-';
                 for (size_t j = 0; last_char != '\0'; j++) {
@@ -603,6 +649,11 @@ bool hs_is_op(hs_token_kind_t kind) {
         case HS_TOKEN_DIVIDE:
         case HS_TOKEN_MODULO:
         case HS_TOKEN_POWER:
+        case HS_TOKEN_AND:
+        case HS_TOKEN_OR:
+        case HS_TOKEN_XOR:
+        case HS_TOKEN_SHIFTL:
+        case HS_TOKEN_SHIFTR:
             return true;
         default:
             return false;
@@ -611,15 +662,24 @@ bool hs_is_op(hs_token_kind_t kind) {
 
 int8_t hs_op_prio(hs_token_kind_t kind) {
     switch (kind) {
+        case HS_TOKEN_OR:
+            return 0;
+        case HS_TOKEN_XOR:
+            return 1;
+        case HS_TOKEN_AND:
+            return 2;
+        case HS_TOKEN_SHIFTL:
+        case HS_TOKEN_SHIFTR:
+            return 3;
         case HS_TOKEN_ADD:
         case HS_TOKEN_SUBTRACT:
-            return 0;
+            return 4;
         case HS_TOKEN_MULTIPLY:
         case HS_TOKEN_DIVIDE:
         case HS_TOKEN_MODULO:
-            return 1;
+            return 5;
         case HS_TOKEN_POWER:
-            return 2;
+            return 6;
         default:
             return -1;
     }
@@ -691,6 +751,11 @@ hs_token_list_t hs_shunting_yard(hs_token_list_t tokens) {
             case HS_TOKEN_DIVIDE:
             case HS_TOKEN_MODULO:
             case HS_TOKEN_POWER:
+            case HS_TOKEN_AND:
+            case HS_TOKEN_OR:
+            case HS_TOKEN_XOR:
+            case HS_TOKEN_SHIFTL:
+            case HS_TOKEN_SHIFTR:
                 while (stack.size > 0 &&
                        hs_is_op(stack.items[stack.size - 1].kind) &&
                        hs_op_prio(tokens.items[input_i].kind) <= hs_op_prio(stack.items[stack.size - 1].kind)) {
@@ -1020,6 +1085,36 @@ hs_value_t hs_solve(hs_token_list_t tokens, hs_state_t *state) {
                 b = hs_value_list_pop(&list);
                 a = hs_value_list_pop(&list);
                 if (!hs_value_list_push(&list, hs_f_pow(a, b)))
+                    goto hs_solve_error;
+                break;
+            case HS_TOKEN_AND:
+                b = hs_value_list_pop(&list);
+                a = hs_value_list_pop(&list);
+                if (!hs_value_list_push(&list, hs_f_and(a, b)))
+                    goto hs_solve_error;
+                break;
+            case HS_TOKEN_OR:
+                b = hs_value_list_pop(&list);
+                a = hs_value_list_pop(&list);
+                if (!hs_value_list_push(&list, hs_f_or(a, b)))
+                    goto hs_solve_error;
+                break;
+            case HS_TOKEN_XOR:
+                b = hs_value_list_pop(&list);
+                a = hs_value_list_pop(&list);
+                if (!hs_value_list_push(&list, hs_f_xor(a, b)))
+                    goto hs_solve_error;
+                break;
+            case HS_TOKEN_SHIFTL:
+                b = hs_value_list_pop(&list);
+                a = hs_value_list_pop(&list);
+                if (!hs_value_list_push(&list, hs_f_shiftl(a, b)))
+                    goto hs_solve_error;
+                break;
+            case HS_TOKEN_SHIFTR:
+                b = hs_value_list_pop(&list);
+                a = hs_value_list_pop(&list);
+                if (!hs_value_list_push(&list, hs_f_shiftr(a, b)))
                     goto hs_solve_error;
                 break;
             default:
