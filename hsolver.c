@@ -5,7 +5,6 @@
 #include <math.h>
 
 // TODO:
-//  - fix "bin x=1"
 //  - commands for char settings (sep_char_in/_out, dec_sep_char_in/_out)
 //  - console colors/bold (especially "list")
 
@@ -40,10 +39,10 @@ const char *help_text = \
 "  help" ENDL \
 "  list" ENDL \
 "  settings" ENDL \
-"  bin [inline expression]" ENDL \
-"  oct [inline expression]" ENDL \
-"  dec [inline expression]" ENDL \
-"  hex [inline expression]" ENDL \
+"  bin [optional inline expression]" ENDL \
+"  oct [optional inline expression]" ENDL \
+"  dec [optional inline expression]" ENDL \
+"  hex [optional inline expression]" ENDL \
 "  scient_min = expression" ENDL \
 "  scient_max = expression" ENDL \
 "  sep_out = expression" ENDL \
@@ -502,6 +501,7 @@ hs_token_t hs_token_list_pop(hs_token_list_t *list) {
         list->size--;
         return list->items[list->size];
     } else {
+        printf("WARNING: missing some expected token" ENDL);
         return (hs_token_t){
             .kind = HS_TOKEN_EOF,
         };
@@ -868,6 +868,7 @@ hs_value_t hs_value_list_pop(hs_value_list_t *list) {
         list->size--;
         return list->items[list->size];
     } else {
+        printf("WARNING: missing some expected value" ENDL);
         return HS_ZERO;
     }
 }
@@ -1282,126 +1283,13 @@ void hs_output(hs_value_t value, hs_state_t *state) {
     }
 }
 
-hs_settings_t temp_settings;
-
-void hs_run(char *input, hs_state_t *state) {
-    if (state == NULL) {
-        return;
-    }
-
-    hs_preprocess_input(input);
-
-    size_t lvalue_i = 0;
-    char lvalue_buffer[HS_BUF_SIZE];
-    for (; lvalue_i < sizeof(lvalue_buffer); lvalue_i++) {
-        if (input[lvalue_i] == '\0') {
-            lvalue_i = 0;
-            break;
-        } else if (input[lvalue_i] == '=') {
-            lvalue_buffer[lvalue_i] = '\0';
-            break;
-        } else {
-            lvalue_buffer[lvalue_i] = input[lvalue_i];
-        }
-    }
-    hs_var_t lvalue_var = {
-        .id = "",
-        .value = HS_ZERO,
-    };
-    hs_func_t lvalue_func = {
-        .id = "",
-        .func = NULL,
-        .params_count = 0,
-        .params_linked = NULL,
-        .expression = "",
-    };
-    if (lvalue_i > 0) {
-        hs_token_list_t tokens_lvalue = hs_tokenize(lvalue_buffer, state);
-        if (tokens_lvalue.items == NULL)
-            goto hs_run_error;
-        if (tokens_lvalue.size == 2) {
-            if (tokens_lvalue.items[0].kind == HS_TOKEN_ID) {
-                for (size_t i = 0; i < HS_BUF_SIZE; i++) {
-                    lvalue_var.id[i] = tokens_lvalue.items[0].content[i];
-                    if (lvalue_var.id[i] == '\0')
-                        break;
-                }
-            }
-        } else if (tokens_lvalue.size > 2) {
-            if (tokens_lvalue.items[0].kind == HS_TOKEN_ID &&
-                tokens_lvalue.items[1].kind == HS_TOKEN_OPEN_P) {
-                lvalue_func.params_count = 0;
-                hs_func_param_t *param = NULL;
-                for (size_t t_i = 2; t_i < tokens_lvalue.size; t_i += 2) {
-                    bool is_last = false;
-                    if (tokens_lvalue.items[t_i].kind == HS_TOKEN_CLOSE_P) {
-                        break;
-                    }
-                    if (tokens_lvalue.items[t_i].kind != HS_TOKEN_ID) {
-                        printf("ERROR: invalid format for function definition" ENDL);
-                        free(tokens_lvalue.items);
-                        return;
-                    }
-                    if (tokens_lvalue.items[t_i + 1].kind == HS_TOKEN_CLOSE_P) {
-                        is_last = true;
-                    } else if (tokens_lvalue.items[t_i + 1].kind != HS_TOKEN_COMMA) {
-                        printf("ERROR: invalid format for function definition" ENDL);
-                        free(tokens_lvalue.items);
-                        return;
-                    }
-                    hs_func_param_t *next_param = malloc(sizeof(hs_func_param_t));
-                    if (param != NULL) {
-                        param->next = next_param;
-                    } else {
-                        lvalue_func.params_linked = next_param;
-                    }
-                    param = next_param;
-                    for (size_t s_i = 0; s_i < HS_BUF_SIZE; s_i++) {
-                        param->id[s_i] = tokens_lvalue.items[t_i].content[s_i];
-                        if (param->id[s_i] == '\0')
-                            break;
-                    }
-                    param->next = NULL;
-                    lvalue_func.params_count++;
-                    if (is_last)
-                        break;
-                }
-                for (size_t i = 0; i < HS_BUF_SIZE; i++) {
-                    lvalue_func.id[i] = tokens_lvalue.items[0].content[i];
-                    if (lvalue_func.id[i] == '\0')
-                        break;
-                }
-                lvalue_func.expression = malloc(hs_str_len(input + lvalue_i));
-                for (size_t i = 0; i < hs_str_len(input + lvalue_i); i++) {
-                    lvalue_func.expression[i] = input[lvalue_i + 1 + i];
-                }
-                hs_funcs_push(state, lvalue_func);
-            }
-        }
-        free(tokens_lvalue.items);
-        if (lvalue_func.id[0] != '\0') {
-            return;
-        }
-    }
-
-    hs_token_list_t tokens1 = hs_tokenize(input + lvalue_i, state);
-    if (tokens1.items == NULL)
-        goto hs_run_error;
-
-    bool restore_settings = false;
-    if (tokens1.size > 1) {
-        temp_settings = state->settings;
-    }
-
-    hs_token_list_t tokens2 = hs_token_list_init();
-    if (tokens2.items == NULL)
-        goto hs_run_error;
-    for (size_t i = 0; i < tokens1.size; i++) {
-        if (tokens1.items[i].kind == HS_TOKEN_ID) {
-            if (hs_str_same(tokens1.items[i].content, "help")) {
+uint8_t hs_handle_commands(hs_token_list_t *tokens1, hs_token_list_t *tokens2, bool *is_number_base, hs_state_t *state) {
+    for (size_t i = 0; i < tokens1->size; i++) {
+        if (tokens1->items[i].kind == HS_TOKEN_ID) {
+            if (hs_str_same(tokens1->items[i].content, "help")) {
                 printf(help_text);
                 continue;
-            } else if (hs_str_same(tokens1.items[i].content, "list")) {
+            } else if (hs_str_same(tokens1->items[i].content, "list")) {
                 size_t len_func = 0;
                 size_t len_var = 0;
                 
@@ -1509,7 +1397,7 @@ void hs_run(char *input, hs_state_t *state) {
                     printf(ENDL);
                 }
                 continue;
-            } else if (hs_str_same(tokens1.items[i].content, "settings")) {
+            } else if (hs_str_same(tokens1->items[i].content, "settings")) {
                 printf("--SETTINGS--" ENDL);
                 printf("  scient_min = %f" ENDL, state->settings.scient_min);
                 printf("  scient_max = %f" ENDL, state->settings.scient_max);
@@ -1519,33 +1407,170 @@ void hs_run(char *input, hs_state_t *state) {
                 printf("  sep_char_in = %c" ENDL, state->settings.sep_char_in);
                 printf("  sep_char_out = %c" ENDL, state->settings.sep_char_out);
                 continue;
-            } else if (hs_str_same(tokens1.items[i].content, "dec")) {
+            } else if (hs_str_same(tokens1->items[i].content, "dec")) {
                 state->settings.output_mode = HS_OUTPUT_DEC;
-                restore_settings = true;
+                if (is_number_base != NULL)
+                    *is_number_base = true;
                 continue;
-            } else if (hs_str_same(tokens1.items[i].content, "hex")) {
+            } else if (hs_str_same(tokens1->items[i].content, "hex")) {
                 state->settings.output_mode = HS_OUTPUT_HEX;
-                restore_settings = true;
+                if (is_number_base != NULL)
+                    *is_number_base = true;
                 continue;
-            } else if (hs_str_same(tokens1.items[i].content, "oct")) {
+            } else if (hs_str_same(tokens1->items[i].content, "oct")) {
                 state->settings.output_mode = HS_OUTPUT_OCT;
-                restore_settings = true;
+                if (is_number_base != NULL)
+                    *is_number_base = true;
                 continue;
-            } else if (hs_str_same(tokens1.items[i].content, "bin")) {
+            } else if (hs_str_same(tokens1->items[i].content, "bin")) {
                 state->settings.output_mode = HS_OUTPUT_BIN;
-                restore_settings = true;
+                if (is_number_base != NULL)
+                    *is_number_base = true;
                 continue;
             }
         }
-        if (!hs_token_list_push(&tokens2, tokens1.items[i]))
-            goto hs_run_error;
+        if (tokens2 != NULL)
+            if (!hs_token_list_push(tokens2, tokens1->items[i]))
+                return 1;
     }
+
+    return 0;
+}
+
+hs_settings_t temp_settings;
+
+void hs_run(char *input, hs_state_t *state) {
+    if (state == NULL) {
+        return;
+    }
+
+    hs_token_list_t tokens1 = {.items = NULL, .size = 0, .capacity = 0};
+    hs_token_list_t tokens2 = {.items = NULL, .size = 0, .capacity = 0};
+    hs_token_list_t tokens3 = {.items = NULL, .size = 0, .capacity = 0};
+
+    bool restore_settings = false;
+    temp_settings = state->settings;
+
+    hs_preprocess_input(input);
+
+    size_t lvalue_i = 0;
+    char lvalue_buffer[HS_BUF_SIZE];
+    for (; lvalue_i < sizeof(lvalue_buffer); lvalue_i++) {
+        if (input[lvalue_i] == '\0') {
+            lvalue_i = 0;
+            break;
+        } else if (input[lvalue_i] == '=') {
+            lvalue_buffer[lvalue_i] = '\0';
+            break;
+        } else {
+            lvalue_buffer[lvalue_i] = input[lvalue_i];
+        }
+    }
+    hs_var_t lvalue_var = {
+        .id = "",
+        .value = HS_ZERO,
+    };
+    hs_func_t lvalue_func = {
+        .id = "",
+        .func = NULL,
+        .params_count = 0,
+        .params_linked = NULL,
+        .expression = "",
+    };
+    if (lvalue_i > 0) {
+        hs_token_list_t tokens_lvalue = hs_tokenize(lvalue_buffer, state);
+        if (tokens_lvalue.items == NULL)
+            goto hs_run_error;
+        hs_token_list_t tokens_lvalue2 = hs_token_list_init();
+        if (tokens_lvalue2.items == NULL)
+            goto hs_run_error;
+        if (hs_handle_commands(&tokens_lvalue, &tokens_lvalue2, &restore_settings, state) != 0)
+            goto hs_run_error;
+        free(tokens_lvalue.items);
+        if (tokens_lvalue2.size == 2) {
+            if (tokens_lvalue2.items[0].kind == HS_TOKEN_ID) {
+                for (size_t i = 0; i < HS_BUF_SIZE; i++) {
+                    lvalue_var.id[i] = tokens_lvalue2.items[0].content[i];
+                    if (lvalue_var.id[i] == '\0')
+                        break;
+                }
+            } else {
+                printf("WARNING: did not understand input left of \"=\", will be ignored" ENDL);
+            }
+        } else if (tokens_lvalue2.size > 2) {
+            if (tokens_lvalue2.items[0].kind == HS_TOKEN_ID &&
+                tokens_lvalue2.items[1].kind == HS_TOKEN_OPEN_P) {
+                lvalue_func.params_count = 0;
+                hs_func_param_t *param = NULL;
+                for (size_t t_i = 2; t_i < tokens_lvalue2.size; t_i += 2) {
+                    bool is_last = false;
+                    if (tokens_lvalue2.items[t_i].kind == HS_TOKEN_CLOSE_P) {
+                        break;
+                    }
+                    if (tokens_lvalue2.items[t_i].kind != HS_TOKEN_ID) {
+                        printf("ERROR: invalid format for function definition" ENDL);
+                        free(tokens_lvalue2.items);
+                        goto hs_run_error;
+                    }
+                    if (tokens_lvalue2.items[t_i + 1].kind == HS_TOKEN_CLOSE_P) {
+                        is_last = true;
+                    } else if (tokens_lvalue2.items[t_i + 1].kind != HS_TOKEN_COMMA) {
+                        printf("ERROR: invalid format for function definition" ENDL);
+                        free(tokens_lvalue2.items);
+                        goto hs_run_error;
+                    }
+                    hs_func_param_t *next_param = malloc(sizeof(hs_func_param_t));
+                    if (param != NULL) {
+                        param->next = next_param;
+                    } else {
+                        lvalue_func.params_linked = next_param;
+                    }
+                    param = next_param;
+                    for (size_t s_i = 0; s_i < HS_BUF_SIZE; s_i++) {
+                        param->id[s_i] = tokens_lvalue2.items[t_i].content[s_i];
+                        if (param->id[s_i] == '\0')
+                            break;
+                    }
+                    param->next = NULL;
+                    lvalue_func.params_count++;
+                    if (is_last)
+                        break;
+                }
+                for (size_t i = 0; i < HS_BUF_SIZE; i++) {
+                    lvalue_func.id[i] = tokens_lvalue2.items[0].content[i];
+                    if (lvalue_func.id[i] == '\0')
+                        break;
+                }
+                lvalue_func.expression = malloc(hs_str_len(input + lvalue_i));
+                for (size_t i = 0; i < hs_str_len(input + lvalue_i); i++) {
+                    lvalue_func.expression[i] = input[lvalue_i + 1 + i];
+                }
+                hs_funcs_push(state, lvalue_func);
+            } else {
+                printf("WARNING: did not understand input left of \"=\", will be ignored" ENDL);
+            }
+        }
+        free(tokens_lvalue2.items);
+        if (lvalue_func.id[0] != '\0') {
+            return;
+        }
+    }
+
+    tokens1 = hs_tokenize(input + lvalue_i, state);
+    if (tokens1.items == NULL)
+        goto hs_run_error;
+
+    tokens2 = hs_token_list_init();
+    if (tokens2.items == NULL)
+        goto hs_run_error;
+    if (hs_handle_commands(&tokens1, &tokens2, &restore_settings, state) != 0)
+        goto hs_run_error;
+    free(tokens1.items);
     if (tokens2.items[0].kind == HS_TOKEN_EOF) {
         restore_settings = false;
     }
-    free(tokens1.items);
 
-    hs_token_list_t tokens3 = hs_shunting_yard(tokens2);
+    tokens3 = hs_shunting_yard(tokens2);
     if (tokens3.items == NULL)
         goto hs_run_error;
     free(tokens2.items);

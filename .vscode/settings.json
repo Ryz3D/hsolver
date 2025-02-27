@@ -1,0 +1,10 @@
+{
+    "files.associations": {
+        "*.h": "c",
+        "*.lco": "latex",
+        "initializer_list": "c",
+        "type_traits": "c",
+        "xstring": "c",
+        "xutility": "c"
+    }
+}
