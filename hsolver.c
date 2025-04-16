@@ -809,10 +809,6 @@ hs_token_list_t hs_shunting_yard(hs_token_list_t tokens) {
     }
     while (stack.size > 0) {
         hs_token_t stack_token = hs_token_list_pop(&stack);
-        if (stack_token.kind == HS_TOKEN_OPEN_P) {
-            printf("ERROR: more opening than closing parentheses" ENDL);
-            break;
-        }
         if (!hs_token_list_push(&output, stack_token))
             goto hs_shunting_yard_error;
     }
